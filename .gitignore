@@ -1,0 +1,24 @@
+# --- SECRETOS: nada de esto va nunca al repo ---
+.env
+.env.docker
+credenciales.json
+*.pem
+*.key
+
+# --- DATOS DE CLIENTES: conversaciones reales, no se publican ---
+data/
+
+# --- Fotos y documentos del negocio: pesan y son suyos ---
+fotos/
+documentos/
+
+# --- Generados ---
+node_modules/
+web/.bundle.js
+web/simulador.html
+web/entrenador.build.html
+*.log
+
+# --- Claude Code: los ajustes personales no se versionan (settings.json y agents/ sí) ---
+.claude/settings.local.json
+qr-piedra.png

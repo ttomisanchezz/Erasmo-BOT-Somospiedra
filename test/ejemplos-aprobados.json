@@ -1,0 +1,356 @@
+[
+  {
+    "id": "v1-f6fe14be0dc8",
+    "version": 1,
+    "fecha": "2026-09-24",
+    "fuente": "v1",
+    "etiqueta": "dato-desactualizado"
+  },
+  {
+    "id": "v1-00717038ae07",
+    "version": 1,
+    "fecha": "2026-09-24",
+    "fuente": "v1",
+    "etiqueta": "no-usar"
+  },
+  {
+    "id": "v1-e9d796194758",
+    "version": 1,
+    "fecha": "2026-09-24",
+    "fuente": "v1",
+    "etiqueta": "no-usar"
+  },
+  {
+    "id": "v1-9db00d1e0404",
+    "version": 1,
+    "fecha": "2026-09-24",
+    "fuente": "v1",
+    "etiqueta": "no-usar"
+  },
+  {
+    "id": "v1-cb74627025e1",
+    "version": 1,
+    "fecha": "2026-09-24",
+    "fuente": "v1",
+    "etiqueta": "no-usar"
+  },
+  {
+    "id": "v1-f52eeea49996",
+    "version": 1,
+    "fecha": "2026-09-24",
+    "fuente": "v1",
+    "etiqueta": "no-usar"
+  },
+  {
+    "id": "v1-32aee520ca46",
+    "version": 1,
+    "fecha": "2026-09-24",
+    "fuente": "v1",
+    "etiqueta": "buena",
+    "situacion": {
+      "cliente": [
+        "Estoy aca ya creo"
+      ],
+      "contexto": []
+    },
+    "intencionLeida": null,
+    "commitBot": null,
+    "respuesta": "Voy",
+    "accion": "escala-callado",
+    "conPrecio": false,
+    "limites": [
+      "precio",
+      "venta",
+      "stock"
+    ],
+    "nota": "quiere decir que esta en el local: escala callado para que lo atienda una persona (corrección 24/09)",
+    "estado": "fijado",
+    "fijado": "2026-09-25"
+  },
+  {
+    "id": "v1-48f6385cd540",
+    "version": 1,
+    "fecha": "2026-09-24",
+    "fuente": "v1",
+    "etiqueta": "no-usar"
+  },
+  {
+    "id": "v1-0cba2a5aaeae",
+    "version": 1,
+    "fecha": "2026-09-24",
+    "fuente": "v1",
+    "etiqueta": "no-usar"
+  },
+  {
+    "id": "v1-5dc66e8769f1",
+    "version": 1,
+    "fecha": "2026-09-24",
+    "fuente": "v1",
+    "etiqueta": "no-usar"
+  },
+  {
+    "id": "v1-d685ad48e678",
+    "version": 1,
+    "fecha": "2026-09-24",
+    "fuente": "v1",
+    "etiqueta": "falto-contexto"
+  },
+  {
+    "id": "v1-19f47c11f3f0",
+    "version": 1,
+    "fecha": "2026-09-24",
+    "fuente": "v1",
+    "etiqueta": "no-usar"
+  },
+  {
+    "id": "v1-f897fef943e5",
+    "version": 1,
+    "fecha": "2026-09-24",
+    "fuente": "v1",
+    "etiqueta": "no-usar"
+  },
+  {
+    "id": "v1-0dd0eac950c7",
+    "version": 1,
+    "fecha": "2026-09-24",
+    "fuente": "v1",
+    "etiqueta": "no-usar"
+  },
+  {
+    "id": "v1-210447ebbbb0",
+    "version": 1,
+    "fecha": "2026-09-24",
+    "fuente": "v1",
+    "etiqueta": "no-usar"
+  },
+  {
+    "id": "v1-637e9e7a6fa8",
+    "version": 1,
+    "fecha": "2026-09-24",
+    "fuente": "v1",
+    "etiqueta": "no-usar"
+  },
+  {
+    "id": "v1-c88b47b31b49",
+    "version": 1,
+    "fecha": "2026-09-24",
+    "fuente": "v1",
+    "etiqueta": "no-usar"
+  },
+  {
+    "id": "v1-cb2a2902cfb0",
+    "version": 1,
+    "fecha": "2026-09-24",
+    "fuente": "v1",
+    "etiqueta": "no-usar"
+  },
+  {
+    "id": "v1-e8b71ea978bd",
+    "version": 1,
+    "fecha": "2026-09-24",
+    "fuente": "v1",
+    "etiqueta": "no-usar"
+  },
+  {
+    "id": "v1-1a8bbeb2a5e0",
+    "version": 1,
+    "fecha": "2026-09-24",
+    "fuente": "v1",
+    "etiqueta": "no-usar"
+  },
+  {
+    "id": "v1-b191cf048e50",
+    "version": 2,
+    "fecha": "2026-09-24",
+    "fuente": "v1",
+    "etiqueta": "buena",
+    "situacion": {
+      "cliente": [
+        "Mi nombre es Oriana"
+      ],
+      "contexto": [
+        {
+          "humano": "genial te esperamos entonces☺️ me confirmas el 16 entonces"
+        },
+        {
+          "cliente": "Te jodo mucho si me envías fotos o videos de ambos, del 15 y 16 xfa"
+        },
+        {
+          "tanda": [
+            "Te jodo mucho si me envías fotos o videos de ambos, del 15 y 16 xfa"
+          ],
+          "enviado": false
+        },
+        {
+          "humano": "te mando el 16 que es el que tengo en la oficina"
+        }
+      ]
+    },
+    "intencionLeida": null,
+    "commitBot": null,
+    "respuesta": "no hay problema! dale ori ahi pido fotos sino mañana le saco y te envio",
+    "accion": "escala-callado",
+    "conPrecio": false,
+    "debeDecir": [],
+    "limites": [],
+    "nota": "pidió fotos del 15 y del 16: escala callado y el grupo decide (bloque 8: si hay stock las manda Tomás, si no #sinstock) (corrección 24/09)",
+    "estado": "fijado",
+    "fijado": "2026-09-25"
+  },
+  {
+    "id": "v1-6010a2178346",
+    "version": 1,
+    "fecha": "2026-09-24",
+    "fuente": "v1",
+    "etiqueta": "no-usar"
+  },
+  {
+    "id": "v1-e3b6783dc7d0",
+    "version": 1,
+    "fecha": "2026-09-24",
+    "fuente": "v1",
+    "etiqueta": "no-usar"
+  },
+  {
+    "id": "v1-000890618167",
+    "version": 1,
+    "fecha": "2026-09-24",
+    "fuente": "v1",
+    "etiqueta": "no-usar"
+  },
+  {
+    "id": "v1-e88eed022eb5",
+    "version": 1,
+    "fecha": "2026-09-24",
+    "fuente": "v1",
+    "etiqueta": "no-usar"
+  },
+  {
+    "id": "v1-7e664c7a5ed2",
+    "version": 1,
+    "fecha": "2026-09-24",
+    "fuente": "v1",
+    "etiqueta": "no-usar"
+  },
+  {
+    "id": "v1-d02f0920f916",
+    "version": 1,
+    "fecha": "2026-09-24",
+    "fuente": "v1",
+    "etiqueta": "no-usar"
+  },
+  {
+    "id": "v1-5f0130a224e8",
+    "version": 1,
+    "fecha": "2026-09-24",
+    "fuente": "v1",
+    "etiqueta": "falto-contexto"
+  },
+  {
+    "id": "v1-50d31d1c6168",
+    "version": 1,
+    "fecha": "2026-09-24",
+    "fuente": "v1",
+    "etiqueta": "buena",
+    "situacion": {
+      "cliente": [
+        "Un día de estos seguro me pegue una vuelta"
+      ],
+      "contexto": []
+    },
+    "intencionLeida": null,
+    "commitBot": null,
+    "respuesta": "Te comento, nos manejamos con turnos nosotros mas que nada para que no se nos junten clientes y los hacerlos esperar\nAsi que cuando vos puedas, me confirmas y te agendo en el horario que vos puedas",
+    "accion": "contesta",
+    "conPrecio": false,
+    "limites": [
+      "contado",
+      "cuotas"
+    ],
+    "nota": "explicar que nos manejamos por turnos; sin hablar de contado ni cuotas (corrección 24/09)",
+    "estado": "fijado",
+    "debeDecir": [
+      "turno"
+    ],
+    "fijado": "2026-09-25"
+  },
+  {
+    "id": "v1-ab1975c587d8",
+    "version": 1,
+    "fecha": "2026-09-24",
+    "fuente": "v1",
+    "etiqueta": "falto-contexto",
+    "nota": "sin el chat previo no se sabe si ya se pasaron las cuotas (corrección 24/09, antes buena)"
+  },
+  {
+    "id": "v1-9a9b2d338320",
+    "version": 1,
+    "fecha": "2026-09-24",
+    "fuente": "v1",
+    "etiqueta": "no-usar"
+  },
+  {
+    "id": "v1-0b1266ba63dc",
+    "version": 1,
+    "fecha": "2026-09-24",
+    "fuente": "v1",
+    "etiqueta": "no-usar"
+  },
+  {
+    "id": "v1-c8c7f754b664",
+    "version": 1,
+    "fecha": "2026-09-24",
+    "fuente": "v1",
+    "etiqueta": "no-usar"
+  },
+  {
+    "id": "v1-80baf895827e",
+    "version": 1,
+    "fecha": "2026-09-24",
+    "fuente": "v1",
+    "etiqueta": "no-usar"
+  },
+  {
+    "id": "v1-4911d2a0ffee",
+    "version": 1,
+    "fecha": "2026-09-24",
+    "fuente": "v1",
+    "etiqueta": "no-usar"
+  },
+  {
+    "id": "v1-9928e183800e",
+    "version": 1,
+    "fecha": "2026-09-24",
+    "fuente": "v1",
+    "etiqueta": "no-usar"
+  },
+  {
+    "id": "v1-3295a1868550",
+    "version": 1,
+    "fecha": "2026-09-24",
+    "fuente": "v1",
+    "etiqueta": "buena",
+    "situacion": {
+      "cliente": [
+        "Hola buenas noches,quería saber si tenían 17 pro Max usado para hacer plan canje por el mío"
+      ],
+      "contexto": []
+    },
+    "intencionLeida": null,
+    "commitBot": null,
+    "respuesta": "buenas como va\nssii",
+    "accion": "contesta",
+    "conPrecio": false,
+    "limites": [],
+    "nota": "perefecto",
+    "estado": "fijado",
+    "fijado": "2026-09-24"
+  },
+  {
+    "id": "v1-711ed7767e9a",
+    "version": 1,
+    "fecha": "2026-09-24",
+    "fuente": "v1",
+    "etiqueta": "falto-contexto"
+  }
+]
