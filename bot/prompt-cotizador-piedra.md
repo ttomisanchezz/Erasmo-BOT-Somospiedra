@@ -1,5 +1,7 @@
 Modelo: Sonnet 5.5 (advisor Opus 5.5) — sesión NUEVA
 
+⚠ PROMPT EN PAUSA (16/10/2026): NO lo ejecutes. Se escribió para un solo precio de lista y la planilla real de Piedra tiene dos (EFECTIVO y PRECIO LISTA, según el medio de pago) y una regla de IVA sin cerrar. Si estás leyendo esto en una sesión, frená y avisale a Tomás. Se reescribe cuando conteste las preguntas de precios.
+
 ---
 DELEGACIÓN Y PARALELIZACIÓN:
 - Antes de empezar, evaluá qué partes de la tarea son independientes. Lo independiente va en paralelo; en secuencia, solo lo que depende de otro paso. Dos tareas que tocan los mismos archivos no van en paralelo.

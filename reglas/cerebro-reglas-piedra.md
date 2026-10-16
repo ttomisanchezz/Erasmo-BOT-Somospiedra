@@ -45,6 +45,8 @@ Si escalás, no mandás nada más en esa respuesta. Ante la duda, escalá; pero 
 
 # Cómo se cotiza
 
+> EN REVISIÓN (16/10/2026): lo de abajo asume un solo precio de lista y que el bot dice la lista sin factura. La planilla real tiene dos precios: PRECIO LISTA (tarjeta, débito, crédito y cheque, por postnet) y EFECTIVO (a veces sin factura; con factura normalmente más IVA). No usar esta sección hasta contestar las preguntas de precios (`piedra/modelo-de-precios.md` del Cortex, y sección 9 de `preguntas-para-fran-v2.md`).
+
 Qué precio se dice (decisión de Tomás del 15/10/2026, `[FRAN]` confirmar):
 - Por defecto: el precio de lista, sin factura.
 - Con factura: lista más 21 % de IVA; lo calcula `cotizar`. Tarjeta y cuotas, solo con factura. (APP: §2.2)

@@ -1,5 +1,7 @@
 # Casos de prueba de Somos Piedra — BORRADOR (Etapa 2)
 
+> EN REVISIÓN (16/10/2026): los casos 3, 16 y todos los de la sección B (pago, factura, cuotas) asumen "precio de lista sin factura". La planilla real tiene dos precios (efectivo y lista, según el medio de pago). Se reescriben cuando Tomás conteste las preguntas de precios.
+
 Estado: 15/10/2026. Están en texto para que los revises. Cuando se aprueben las reglas y esté el prompt 4 (herramientas del cerebro), se convierten al formato de `test/bateria-cerebro-casos.js` y a los casos de `evaluar --offline`.
 
 Cómo se armaron: cada caso sale de una conversación real del historial, identificada en la columna **Origen** (`cXXXX#n` = chat y conversación en `resultados.jsonl`). Lo que "escribe el cliente" es **inventado y parafraseado**: sin nombres, sin teléfonos reales (5490000000000) y sin montos de verdad. Ningún importe se escribe a mano: lo calcula la herramienta con una planilla de prueba.

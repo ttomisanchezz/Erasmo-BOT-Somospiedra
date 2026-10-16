@@ -109,7 +109,7 @@ La v1 tenía 24 preguntas. El historial responde bien 9, contesta a medias 5, y 
 ## 6. Decisiones que son de Tomás, no de Fran
 
 - **Fotos y audios.** 62 % de las conversaciones tienen alguna foto o audio relevante, y los audios son el 11 % de los mensajes. El código heredado **ya transcribe audios con Gemini y ve hasta 3 fotos por tanda con Sonnet** (unos US$0,005 por foto). Un audio que no se entiende nunca se cotiza: se pide que lo escriban y se avisa al grupo. Falta: la clave de Gemini en el `.env` de Piedra, las reglas de Piedra para fotos y audios (las de iPhone hablan de canje y baterías), la biblioteca de fotos de producto (F1) y probar con 5–10 audios reales antes de prender. Los audios viejos del historial pueden no bajarse; eso se mide aparte.
-- **Precio por defecto** (efectivo o lista): propuesta: lista sin factura; el IVA y la tarjeta se mencionan si preguntan por factura o cuotas (ver C5). Tomás lo confirma.
+- **Precio por defecto**: SUPERADO el 16/10 (ver sección 9). La planilla tiene dos precios, efectivo y lista, según el medio de pago.
 - **Fuera de horario** (23 %): si el bot contesta de noche o solo avisa.
 - **Nombre y presentación del asistente** (¿se presenta como asistente de Piedra o con nombre propio?).
 - **Seguimiento automático** a quien no contesta el presupuesto: no entra en la v1 sin tu decisión.
@@ -130,3 +130,16 @@ La v1 tenía 24 preguntas. El historial responde bien 9, contesta a medias 5, y 
 - **Entrega:** camioneta propia a granel, o camión de fletero para pallets. Precio del envío: sin dato.
 - **Titular:** desde el 01/11/2026 pasa a nombre de Tomás; hasta el 31/10 sigue la SAS.
 - **Sin definir (el bot lo necesita):** % por medio de pago, planes de cuotas, tabla de envíos y desperdicio por defecto.
+
+## 9. Precios de la planilla (16/10/2026): corrige el punto 8
+
+Tomás pasó la lista de precios. Tiene dos columnas, EFECTIVO y PRECIO LISTA. Según Tomás, la lista es lo que se cobra con tarjeta (débito o crédito), cheque y todo lo que pasa por el postnet; el efectivo a veces se vende sin factura al mismo precio y, si piden factura, normalmente se le suma el IVA. Esto reemplaza lo que decía el punto 8 ("un precio de lista") y la propuesta "lista sin factura" de la sección 6. Para Fran:
+
+1. **IVA.** Los precios de la planilla, ¿incluyen el IVA o no? Con factura en efectivo, ¿se suma el 21 % encima? Con tarjeta, ¿se factura siempre y el precio de lista ya es el final?
+2. **"A veces le agregamos de más según la venta".** ¿Cuándo y cuánto? (monto, tipo de cliente, obra, si piden factura.)
+3. **Transferencia, Mercado Pago y QR.** ¿Van con el precio de efectivo o con el de lista?
+4. **Granza.** Los precios son por tramo (1, 10 y 20 m²). ¿Cómo se cobra un pedido que no es un tramo exacto, por ejemplo 12 m²? La granza roja de "1 m³" cuesta lo mismo que la blanca y la gris de 20 m²: ¿1 m³ cubre unos 20 m²?
+5. **Unidad y cobertura de cada producto** (m², baldosa, metro, bolsa, litro, unidad). La planilla no la trae.
+6. **MICOSA RECTIFICADA de 5 cm y de 10 cm** no tienen precio: ¿no se vende o falta cargarlo?
+7. **Colores de las filas** (celeste, verde, rosa): ¿qué significan?
+8. **Dólares.** En esta lista todo está en pesos: ¿hay algún producto en dólares?
