@@ -28,7 +28,7 @@ La v1 tenía 24 preguntas. El historial responde bien 9, contesta a medias 5, y 
 | C2 | Productos (la app de ventas solo prevé piedras naturales, sus insumos —adhesivos, laca, tela antimaleza, granza— y baldosas **de cemento**; el vivero no entra) | (1) Granza y piedra partida decorativa: blanca Mar del Plata, gris, roja con gris, beige. (2) Piedra rodada o lavada. (3) Revestimientos: lajas naturales (verde bronce, ocre, bronceada, pizarra), travertino, murete y murales, Zapala, Micosa, Bariloche. (4) Pórfido y adoquines 10×10. (5) Baldosas de piedra lavada 40×40 con vainillas. (6) Complementos: laca por litro, tela antimaleza por metro, nailon negro. **Pegamento: "no tenemos"**. ¿Falta algo o se dejó de vender algo? |
 | C3 | Unidades | m² (revestimientos, baldosas, pórfido), bolsa de 40 kg, bolsón y m³ (granza), litro, metro. Las lajas se venden "de 10, 15, 20 o 30 cm de alto por largo libre". |
 | C4 | Cómo se cotiza | Primero "¿calculaste los m²?". Después precio × m². Si hay envío, pide la ubicación. Pregunta si es "con envío o retiro en el local". |
-| C5 | Precio según cómo se paga | **La app de ventas lo modela así** (spec del 09/10, decisión de Tomás): el precio que se pasa es el **de lista, sin factura**; **con factura se suma el 21 % de IVA**; **tarjeta y cuotas solo con factura**, con el recargo del plan. El historial es compatible: el "precio de lista" que aparece en los chats es 20–27 % más alto que el de efectivo o transferencia (lo más común, 21 %; 14 casos comparables), y se usa con tarjeta. ¿Es así? ¿Cuándo se factura y qué factura sale? |
+| C5 | Precio según cómo se paga | **Lo definió Tomás (16/10):** la planilla tiene dos precios. **EFECTIVO** vale para efectivo, transferencia, Mercado Pago y QR; sin factura es ese precio y **con factura se suma el 21 % de IVA**. **PRECIO LISTA** vale para tarjeta (débito o crédito), cheque y todo lo que pasa por el postnet, y **ya es el precio final con factura**. Si el cliente no dice cómo paga, el bot le pasa el de efectivo y aclara que con tarjeta es otro. ¿Es así? ¿Qué factura sale (A o B)? |
 | C6 | Envío | A domicilio con camioneta. Cuesta entre $20.000 y $45.000 (lo más común: $30.000 y $40.000). A veces no se cobra. Los bolsones se cargan con autoelevador. Localidades que aparecen en los pedidos: Neuquén, Plottier, Centenario, Cinco Saltos, Fernández Oro, Cipolletti, Roca, Plaza Huincul, Senillosa, Añelo, Rincón de los Sauces, Chocón. |
 | C7 | Cómo termina una venta | El cliente retira en el local o coordina la entrega. Paga por transferencia (se manda el alias) o en efectivo. Si hace falta, se manda la factura con CUIT. |
 | C8 | Precios de referencia (solo para chequear que el orden de magnitud está bien) | Granza blanca Mar del Plata: unos $290.000 el bolsón o m³ en octubre 2025 y $300.000–$320.000 entre agosto y octubre 2026. Los revestimientos más consultados (laja, murete, baldosa) andan por $30.000–$48.000 el m²; el pórfido, el travertino y algunas piezas son bastante más caros. **Estos números no se usan en el bot: salen de tu lista actual.** |
@@ -50,7 +50,7 @@ La v1 tenía 24 preguntas. El historial responde bien 9, contesta a medias 5, y 
 
 **Pago y reglas**
 8. **Seña y alias.** La app dice que se vende en el mostrador, sin presupuesto formal ni seña: ¿es así también por WhatsApp? Si se reserva mercadería, ¿cómo? Aparecen **5 alias distintos**: ¿cuál es el oficial, y el bot lo pasa o lo pasa una persona?
-9. **Cuotas y medios de pago.** Confirmá C5. ¿Cuál es el recargo de cada plan de cuotas (2, 3, 6…)? ¿Cuál es el descuento o recargo por efectivo, transferencia, débito y crédito? ¿Aceptan e-cheq, cheques o cuenta corriente para constructores? (Alguien preguntó por e-cheq a 30/60/90 y no se contestó.)
+9. **Cuotas y cheques.** Con tarjeta de crédito en cuotas, ¿se cobra el precio de lista igual que en 1 pago o las cuotas tienen recargo? ¿De cuánto por plan (2, 3, 6…)? ¿Aceptan e-cheq, cheques diferidos o cuenta corriente para constructores? (Alguien preguntó por e-cheq a 30/60/90 y no se contestó.)
 10. **Problemas.** ¿Qué pasa si falta mercadería en el viaje, si se rompe, si el color no es el pedido o si el cliente quiere devolver el sobrante? ¿Hay garantía?
 11. **Pasar a una persona.** ¿En qué casos el bot deja de contestar y avisa? Mi propuesta: obra grande (¿desde cuántos m² o pesos?), reclamo, entrega ya acordada, precio especial, pedido de factura con CUIT. ¿Quién atiende cada caso y a qué grupo avisamos?
 
@@ -131,15 +131,13 @@ La v1 tenía 24 preguntas. El historial responde bien 9, contesta a medias 5, y 
 - **Titular:** desde el 01/11/2026 pasa a nombre de Tomás; hasta el 31/10 sigue la SAS.
 - **Sin definir (el bot lo necesita):** % por medio de pago, planes de cuotas, tabla de envíos y desperdicio por defecto.
 
-## 9. Precios de la planilla (16/10/2026): corrige el punto 8
+## 9. Precios de la planilla (16/10/2026)
 
-Tomás pasó la lista de precios. Tiene dos columnas, EFECTIVO y PRECIO LISTA. Según Tomás, la lista es lo que se cobra con tarjeta (débito o crédito), cheque y todo lo que pasa por el postnet; el efectivo a veces se vende sin factura al mismo precio y, si piden factura, normalmente se le suma el IVA. Esto reemplaza lo que decía el punto 8 ("un precio de lista") y la propuesta "lista sin factura" de la sección 6. Para Fran:
+Tomás pasó la lista de precios (dos columnas: EFECTIVO y PRECIO LISTA) y ya definió cómo se usa cada una según el medio de pago y el IVA (ver C5). Para Fran queda esto:
 
-1. **IVA.** Los precios de la planilla, ¿incluyen el IVA o no? Con factura en efectivo, ¿se suma el 21 % encima? Con tarjeta, ¿se factura siempre y el precio de lista ya es el final?
-2. **"A veces le agregamos de más según la venta".** ¿Cuándo y cuánto? (monto, tipo de cliente, obra, si piden factura.)
-3. **Transferencia, Mercado Pago y QR.** ¿Van con el precio de efectivo o con el de lista?
-4. **Granza.** Los precios son por tramo (1, 10 y 20 m²). ¿Cómo se cobra un pedido que no es un tramo exacto, por ejemplo 12 m²? La granza roja de "1 m³" cuesta lo mismo que la blanca y la gris de 20 m²: ¿1 m³ cubre unos 20 m²?
-5. **Unidad y cobertura de cada producto** (m², baldosa, metro, bolsa, litro, unidad). La planilla no la trae.
-6. **MICOSA RECTIFICADA de 5 cm y de 10 cm** no tienen precio: ¿no se vende o falta cargarlo?
-7. **Colores de las filas** (celeste, verde, rosa): ¿qué significan?
-8. **Dólares.** En esta lista todo está en pesos: ¿hay algún producto en dólares?
+1. **"A veces le agregamos de más según la venta".** ¿Cuándo y cuánto? (monto, tipo de cliente, obra.) *(Si Tomás lo contesta antes, este punto sale.)*
+2. **Granza.** Los precios son por tramo (1, 10 y 20 m²). ¿Cómo se cobra un pedido que no es un tramo exacto, por ejemplo 12 m²? La granza roja de "1 m³" cuesta lo mismo que la blanca y la gris de 20 m²: ¿1 m³ cubre unos 20 m²?
+3. **Unidad y cobertura de cada producto** (m², baldosa, metro, bolsa, litro, unidad). La planilla no la trae.
+4. **MICOSA RECTIFICADA de 5 cm y de 10 cm** no tienen precio: ¿no se vende o falta cargarlo?
+5. **Colores de las filas** (celeste, verde, rosa): ¿qué significan?
+6. **Dólares.** En esta lista todo está en pesos: ¿hay algún producto en dólares?
