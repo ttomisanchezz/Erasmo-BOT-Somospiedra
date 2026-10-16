@@ -22,6 +22,8 @@ El bot de Piedra necesita un motor que calcule precios, igual que lo hace la app
 
 Regla heredada del sistema: **los montos no los produce la IA. Los calcula este código** a partir de una tabla de productos. Cuando falta un dato, el motor devuelve `FALTA DATO` y NO lo completa (nada de 0 por defecto, promedios ni estimaciones).
 
+Antes de crear nada, confirmá que el directorio de trabajo es la carpeta de Piedra (`E:\bot-piedra` o, si todavía no se mudó, `C:\bot-whatsapp\bot-piedra`) y NO `C:\bot-whatsapp\bot-whatsapp` ni un `wt-*`; si no lo es, no crees nada y decilo.
+
 Otra sesión puede estar moviendo archivos de `src/` y `test/` (la poda de iPhone). Ignorala: vos trabajás **solo** en `src/cotizador-piedra.js` y `test/cotizador-piedra.test.js` (archivos nuevos). No toques `package.json`: el registro del test lo hago yo en la integración. No requieras ningún otro módulo de `src/`.
 
 ## Qué construir
@@ -73,15 +75,15 @@ Primero los tests que fallan (`node test/cotizador-piedra.test.js`, estilo de lo
 - Números de teléfono inventados (5490000000000).
 - Primero el test que falla, después el arreglo. Al terminar, `npm test` (archivo por archivo si tarda) y `npm run evaluar -- --offline` al 100%.
 - Buscar por texto, no por número de línea.
-- Sin commit ni push. Actualizar `CLAUDE.md` de `bot-piedra`.
+- Sin commit ni push. En esta tarea NO se toca `CLAUDE.md` (la poda de iPhone lo está moviendo): la sección "Cotizador de Piedra" va en el resumen, para que Claude la integre.
 - La máquina: no tocar los ajustes de Antigravity ni de VS Code, no definir `CLAUDE_CONFIG_DIR` y no correr `claude auth login` ni `claude auth logout`. Si `claude` falla por la política de PowerShell, usar `claude.cmd`.
-- Para esta tarea: solo los dos archivos nuevos de arriba y una sección corta en `CLAUDE.md` ("Cotizador de Piedra"). Si la poda de iPhone está en curso y `npm test` o `evaluar` fallan por eso, corré solo `node test/cotizador-piedra.test.js` y decí en el resumen que el resto lo verifico yo.
+- Para esta tarea: solo los dos archivos nuevos de arriba y nada más. Si la poda de iPhone está en curso y `npm test` o `evaluar` fallan por eso, corré solo `node test/cotizador-piedra.test.js` y decí en el resumen que el resto lo verifico yo.
 
 ## PARA COPIAR Y PEGAR (al final)
-1. **Resumen para Claude:** qué se creó, la API final (firmas y forma de la salida), los tests nuevos y cuáles fallaban antes, y el resultado de `node test/cotizador-piedra.test.js` (y de `npm test` y `evaluar` si se pudo).
+1. **Resumen para Claude:** qué se creó, la API final (firmas y forma de la salida), los tests nuevos y cuáles fallaban antes, y el resultado de `node test/cotizador-piedra.test.js` (y de `npm test` y `evaluar` si se pudo). Incluí el texto de la sección "Cotizador de Piedra" para `CLAUDE.md` (hasta 15 líneas).
 2. **Lo que tiene que correr Tomás:** `node test\cotizador-piedra.test.js` y qué tiene que decir.
 3. **La prueba en vivo:** un comando `node -e "..."` que cotice, con productos inventados, los casos de arriba y muestre los montos ya calculados por el código, para que Tomás los compare con su cálculo a mano.
-4. **El comando de commit en la rama** (nombre sugerido: `piedra/cotizador`), solo con los dos archivos y `CLAUDE.md`.
+4. **El comando de commit en la rama** (nombre sugerido: `piedra/cotizador`), solo con los dos archivos.
 5. **Decisiones que tomé solo** (redondeo de m², forma de la API, supuesto del espesor, lo que el advisor cambió).
 
 ---
