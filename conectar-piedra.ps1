@@ -2,7 +2,7 @@
 # Crea la instancia "somospiedra" en el Evolution que ya corre, deja el webhook apuntando a este bot
 # (puerto 3002), muestra el QR para escanear y, cuando conecta, arranca el bot en MODO ESCUCHA.
 # No toca la instancia "somosiphone" ni el bot de Somos iPhone.
-# Uso (PowerShell):  powershell -ExecutionPolicy Bypass -File C:\bot-whatsapp\bot-piedra\conectar-piedra.ps1
+# Uso (PowerShell):  powershell -ExecutionPolicy Bypass -File E:\bot-piedra\conectar-piedra.ps1
 
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
