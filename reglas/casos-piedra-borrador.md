@@ -1,6 +1,6 @@
 # Casos de prueba de Somos Piedra — BORRADOR (Etapa 2)
 
-> EN REVISIÓN (16/10/2026): los casos 3, 16 y todos los de la sección B (pago, factura, cuotas) asumen "precio de lista sin factura". La planilla real tiene dos precios (efectivo y lista, según el medio de pago). Se reescriben cuando Tomás conteste las preguntas de precios.
+> Actualizado el 16/10/2026 con el modelo de dos precios (EFECTIVO: efectivo, transferencia, Mercado Pago y QR, + 21 % con factura; LISTA: tarjeta, cheque y postnet, ya con factura; por defecto el de efectivo aclarando que con tarjeta es otro). Casos 3, 11 y 16 reescritos.
 
 Estado: 15/10/2026. Están en texto para que los revises. Cuando se aprueben las reglas y esté el prompt 4 (herramientas del cerebro), se convierten al formato de `test/bateria-cerebro-casos.js` y a los casos de `evaluar --offline`.
 
@@ -19,7 +19,7 @@ Dependencias: `[P]` necesita planilla de prueba; `[F]` el resultado final depend
 |---|---|---|---|
 | 1 | c0039#1 | "Hola, buenas. Quiero poner piedra decorativa en el jardín. Qué variedades tienen y cuánto sale?" | RESPONDE: nombra las familias de la planilla `[P]` y pregunta cuántos m² cubrir. NO da precio (falta cantidad y producto). |
 | 2 | c0178#1 | "Buenas, precio del m2 de la piedra?" (sin decir cuál) | RESPONDE: pregunta qué piedra o para qué uso. NO da ningún precio. |
-| 3 | c0072#1 | "Necesito piedra blanca para un fogón de 3,5 x 3,5. A cuánto sale?" | RESPONDE: la cantidad y el total salen de `cotizar` con las medidas tal cual; precio de lista sin factura; no menciona IVA ni tarjeta. `[P]` |
+| 3 | c0072#1 | "Necesito piedra blanca para un fogón de 3,5 x 3,5. A cuánto sale?" | RESPONDE: la cantidad y el total salen de `cotizar` con las medidas tal cual; dice el precio de efectivo y aclara que con tarjeta es otro precio. NO menciona IVA ni da el de lista si no lo pide. `[P]` |
 | 4 | c0049#1 | "Venden piedra de jardín en poca cantidad? Son 9 m2." | RESPONDE: sí, con cantidad y total de la herramienta; no inventa espesor distinto de 2–3 cm. `[P][F]` |
 | 5 | c0030#1 | "Cotizame 20 m2 de granza, 30 bolsas blancas y 10 grises, con envío a Roca" | RESPONDE con las bolsas y totales de `cotizar`, sin envío; ESCALA el costo del envío (no hay tabla). Si no puede las dos cosas en una respuesta: ESCALA con motivo "cotización con envío a Roca". `[P][F]` |
 | 6 | c0099#1 | "Valor del m2 del travertino blanco de 10 cm para dos paredes" | RESPONDE con el precio de `cotizar` que usa la cotización del dólar del día; si no hay cotización cargada hoy: ESCALA "falta cotización del dólar". `[P]` |
@@ -32,12 +32,12 @@ Dependencias: `[P]` necesita planilla de prueba; `[F]` el resultado final depend
 
 | # | Origen | Escribe el cliente | Esperado |
 |---|---|---|---|
-| 11 | c0009#1 | "Con débito y con transferencia sale lo mismo? Y con tarjeta de crédito?" | RESPONDE con los números de `cotizar` (con factura: tarjeta y cuotas solo con factura); NO calcula recargos. `[P][F]` Si faltan los % de cuotas: ESCALA. |
+| 11 | c0009#1 | "Con débito y con transferencia sale lo mismo? Y con tarjeta de crédito?" | RESPONDE con los dos precios de `cotizar`: transferencia = efectivo; débito y crédito = lista (ya con factura). NO calcula nada a mano. Si pregunta por cuotas: ESCALA (recargo `[F]`). `[P]` |
 | 12 | c0046#1 | "Necesito cotización formal con factura A a nombre de una empresa" | ESCALA "pide cotización formal con factura A". NO genera PDF. |
 | 13 | c0014#1 | "Quiero pagar con link de pago, con tarjeta" | ESCALA "quiere pagar con tarjeta". NO manda link. |
 | 14 | c0003#1 | "Dale, la compro. A dónde transfiero?" | ESCALA "quiere pagar, pide datos de transferencia". NO pasa alias. `[F]` |
 | 15 | varios (el local pide el CUIT en 4 conversaciones) | "Te paso mi CUIT para la factura" | ESCALA "envía CUIT para facturar". |
-| 16 | c0009#1 | "Me hacés un descuento si pago en efectivo?" | RESPONDE solo con lo que dé `cotizar` para efectivo con y sin factura; NO inventa el descuento. `[P][F]` |
+| 16 | c0009#1 | "Me hacés un descuento si pago en efectivo?" | RESPONDE con el precio de efectivo que da `cotizar` (es el más bajo de la planilla); NO inventa otro descuento. Si insiste en un descuento extra: ESCALA "pide descuento". `[P]` |
 | 17 | c0124#4 | "Y si llevo 80 m2? me hacés mejor precio?" | ESCALA "pide descuento por 80 m²". NO dice "te lo dejo en…". |
 
 ## C. Envío y entrega
