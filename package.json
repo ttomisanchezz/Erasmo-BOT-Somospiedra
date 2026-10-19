@@ -1,37 +1,24 @@
 {
-  "name": "bot-whatsapp-somosiphone",
+  "name": "bot-whatsapp-somospiedra",
   "version": "1.0.0",
-  "description": "Bot de atencion de WhatsApp para Somos iPhone NQN",
+  "description": "Bot de atencion de WhatsApp para Somos Piedra (piedra natural, Neuquen)",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "test": "node test/cotizador-piedra.test.js && node test/catalogo-piedra.test.js && node test/cotizador.test.js && node test/resumen.test.js && node test/lista-blanca.test.js && node test/audio.test.js && node test/personales.test.js && node test/lid.test.js && node test/chats-viejos.test.js && node test/contexto.test.js && node test/sin-venta.test.js && node test/recordatorios.test.js && node test/silencio.test.js && node test/entrega.test.js && node test/notas.test.js && node test/gemini-respaldo.test.js && node test/ventas.test.js && node test/temas.test.js && node test/no-entiende.test.js && node test/seguimiento.test.js && node test/webhook.test.js && node test/tandas.test.js && node test/reset.test.js && node test/seguridad.test.js && node test/control.test.js && node test/marcas.test.js && node test/gemini.test.js && node test/financiacion.test.js && node test/persistencia.test.js && node test/dedupe.test.js && node test/audio-reintento.test.js && node test/precio.test.js && node test/turnos.test.js && node test/redactar.test.js && node test/validacion-comercial.test.js && node test/guardian.test.js && node test/aprendizaje.test.js && node test/aprobar.test.js && node test/fotos-pedido.test.js && node test/saludo.test.js && node test/desde-cero.test.js && node test/pdf-fallido.test.js && node test/techsur.test.js && node test/cerebro.test.js && node test/cerebro-vivo.test.js && node test/fotos-sonnet.test.js && node test/foto-historial-sigue.test.js && node test/sombra-persona.test.js && node test/bateria-cerebro.test.js && node test/espejo-cotizador.test.js && node test/panel-chiara.test.js && node test/silencios-y-salud.test.js && node test/stock-app.test.js && node test/timeout-supabase.test.js && node test/responde-a.test.js && node test/fotos-equipos.test.js && node test/promo-madre.test.js",
-    "probar-planilla": "node test/leer-planilla.js",
-    "chatear": "node test/chatear.js",
-    "guion": "node test/guion.js",
+    "test": "node test/instancia.test.js && node test/cotizador-piedra.test.js && node test/catalogo-piedra.test.js && node test/exportar-historial.test.js && node test/clasificar-historial.test.js && node test/piedra-sonnet.test.js && node test/piedra-tandas.test.js && node test/piedra-control.test.js && node test/piedra-webhook.test.js && node test/dedupe.test.js && node test/persistencia.test.js && node test/lid.test.js && node test/personales.test.js && node test/chats-viejos.test.js && node test/guardian.test.js && node test/recordatorios.test.js && node test/ventas.test.js && node test/sombra-persona.test.js && node test/contexto.test.js && node test/gemini.test.js && node test/gemini-respaldo.test.js && node test/audio-reintento.test.js",
     "evaluar": "node test/evaluar.js",
     "aprender": "node test/aprender.js",
-    "reproducir": "node test/reproducir.js",
-    "sombra": "node test/sombra.js",
-    "bateria-cerebro": "node test/bateria-cerebro.js",
-    "aprobar": "node test/aprobar.js",
-    "simulador": "node web/construir.js",
-    "resumen": "node test/resumen.js",
-    "margenes": "node test/margenes.js",
     "destino": "node test/destino.js",
     "sembrar-viejos": "node test/sembrar-viejos.js",
-    "probar-contexto": "node test/probar-contexto.js",
-    "techsur": "node test/techsur.js",
-    "anuncios": "node test/anuncios.js"
+    "probar-contexto": "node test/probar-contexto.js"
   },
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
-    "express": "^4.21.2",
-    "googleapis": "^144.0.0"
+    "express": "^4.21.2"
   },
   "devDependencies": {
     "playwright": "^1.63.0"
