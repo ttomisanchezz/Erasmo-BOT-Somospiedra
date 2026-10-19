@@ -43,13 +43,12 @@ process.env.SEGUIMIENTO_HORA_DESDE = '9';
 process.env.SEGUIMIENTO_HORA_HASTA = '22';
 process.env.RECORDATORIO_HORA = '8';
 process.env.RECORDATORIO_MAX_REPETICIONES = '10';
+process.env.EVOLUTION_INSTANCE = 'somospiedra';
 process.env.ESTADO_PATH = path.join(os.tmpdir(), 'estado-recordatorios-' + process.pid + '.json');
 // Cerebro Sonnet (01/10/2026): apagado, para no heredar `sombra` del .env real.
 process.env.CEREBRO_MODO = 'apagado';
 process.env.APRENDIZAJE_PATH = path.join(os.tmpdir(), 'apr-recordatorios-' + process.pid + '.jsonl');
 
-const sheets = require('../src/sheets');
-sheets.usarFixture(require('./fixture-planilla'));
 
 const config = require('../src/config');
 const evolution = require('../src/evolution');
@@ -59,8 +58,6 @@ globalThis.fetch = () => {
   throw new Error('salió a la red durante la prueba');
 };
 
-const local = require('../src/extractor-local');
-gemini.entender = async (h, m) => local.entender(m);
 
 const aClientes = [];
 const alGrupo = [];

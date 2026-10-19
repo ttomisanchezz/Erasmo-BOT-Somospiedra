@@ -1,6 +1,6 @@
 'use strict';
 /**
- * Ventas y pérdidas (#vendido / #perdido) y cómo las cuenta el resumen.
+ * Ventas y pérdidas (#vendido / #perdido).
  *
  *   node test/ventas.test.js
  *
@@ -10,7 +10,6 @@
  *   - desde el grupo, con el número del cliente, y nunca a ciegas;
  *   - uno por chat: marcar otra vez corrige, no duplica;
  *   - dos marcas por separado: si el bot propuso algo y si le mandó algo de verdad;
- *   - el resumen cuenta los del día anterior y saca de los pendientes a los marcados.
  *
  * El entorno se fija acá y no se hereda del .env.
  */
@@ -37,14 +36,15 @@ process.env.MENSAJES_SIN_VENTA = '5';
 process.env.SILENCIO_TRAS_HUMANO_MIN = '45';
 process.env.GRUPO_AVISOS_JID = GRUPO;
 process.env.IGNORAR_ANTERIORES_SEG = '120';
+process.env.EVOLUTION_INSTANCE = 'somospiedra';
 process.env.ESTADO_PATH = path.join(os.tmpdir(), 'estado-ventas-' + process.pid + '.json');
 // Cerebro Sonnet (01/10/2026): apagado, para no heredar `sombra` del .env real.
-process.env.CEREBRO_MODO = 'apagado';
+// Sin bot de siempre (poda de iPhone): contesta un Sonnet de mentira (test/sonnet-fijo.js).
+process.env.CEREBRO_MODO = 'todos';
+process.env.ANTHROPIC_API_KEY = 'clave-de-mentira';
+process.env.CEREBRO_SOMBRA_PERSONA_HASTA = '';
 process.env.APRENDIZAJE_PATH = path.join(os.tmpdir(), 'apr-ventas-' + process.pid + '.jsonl');
 
-const sheets = require('../src/sheets');
-sheets.usarFixture(require('./fixture-planilla'));
-sheets.registrarLead = async () => {};
 
 const config = require('../src/config');
 const evolution = require('../src/evolution');
@@ -54,8 +54,6 @@ globalThis.fetch = () => {
   throw new Error('salió a la red durante la prueba');
 };
 
-const local = require('../src/extractor-local');
-gemini.entender = async (h, m) => local.entender(m);
 
 const aClientes = [];
 const alGrupo = [];
@@ -80,12 +78,12 @@ evolution.avisarGrupo = async (t) => {
 };
 evolution.estadoInstancia = async () => ({ state: 'open' });
 
+const sonnetFijo = require('./sonnet-fijo').instalar();
 const bot = require('../src/index');
 const state = require('../src/state');
 const aprendizaje = require('../src/aprendizaje');
 const ventas = require('../src/ventas');
 const recordatorios = require('../src/recordatorios');
-const resumen = require('../src/resumen');
 
 let fallos = 0;
 function check(nombre, fn) {
@@ -118,7 +116,7 @@ const resultadoDe = (chatId) => (state.todos()[chatId] || {}).resultado;
 /** Un chat donde el cliente preguntó y el bot le contestó de verdad (en vivo). */
 async function chatConBot() {
   const chat = nuevoChat();
-  await bot.procesar(mensaje(chat, 'hola tenes el iphone 13?'));
+  await bot.procesar(mensaje(chat, 'hola tienen laja?'));
   await dormir(200);
   return chat;
 }
@@ -224,7 +222,7 @@ async function con(cambios, fn) {
   await check('en borrador el bot propone pero no le manda: "participó" sí, "le mandó" no', async () => {
     const chat = nuevoChat();
     await con({ modoBorrador: true }, async () => {
-      await bot.procesar(mensaje(chat, 'hola tenes el iphone 13?'));
+      await bot.procesar(mensaje(chat, 'hola tienen laja?'));
       await dormir(200);
     });
     const s = state.todos()[chat];
@@ -238,7 +236,7 @@ async function con(cambios, fn) {
     const chat = nuevoChat();
     evolution.enviarTexto = async () => ({ bloqueado: true, motivo: 'fuera de la lista de prueba' });
     try {
-      await bot.procesar(mensaje(chat, 'hola tenes el iphone 13?'));
+      await bot.procesar(mensaje(chat, 'hola tienen laja?'));
       await dormir(200);
     } finally {
       evolution.enviarTexto = enviarTextoAnotando;
@@ -254,31 +252,12 @@ async function con(cambios, fn) {
       throw new Error('Evolution 500');
     };
     try {
-      await bot.procesar(mensaje(chat, 'hola tenes el iphone 13?'));
+      await bot.procesar(mensaje(chat, 'hola tienen laja?'));
       await dormir(200);
     } finally {
       evolution.enviarTexto = enviarTextoAnotando;
     }
     assert.ok(!state.todos()[chat].botEnvio, 'marcó un envío que falló');
-  });
-
-  await check('el seguimiento también cuenta como mensaje mandado', async () => {
-    const chat = nuevoChat();
-    const hace = (h) => Date.now() - h * 3600 * 1000;
-    state.actualizar(chat, {
-      modelo: 'iPhone 13',
-      botPropuso: hace(3),
-      ultimoBot: hace(2),
-      ultimoEnvioCliente: hace(2),
-      // Bloque Ninjo 1b: el seguimiento sale 3 h después de un precio del bot que le llegó.
-      ultimoPrecioBot: hace(3.5),
-      historial: [{ quien: 'cliente', texto: 'tenes el 13?', ts: hace(4) }],
-    });
-    limpiar();
-    const seguimiento = { ...config.seguimiento, activo: true, horaDesde: 0, horaHasta: 24, franjaDesde: 0, franjaHasta: 24 };
-    await con({ seguimiento }, () => bot.revisarSeguimientos({ escribiendoMs: 1 }));
-    assert.ok(aClientes.some((m) => m.numero === chat), 'el caso no prueba nada: no salió el seguimiento');
-    assert.ok(state.todos()[chat].botEnvio, 'el seguimiento salió y no quedó que le mandó');
   });
 
   console.log('\nCorregir, no duplicar\n');
@@ -417,163 +396,11 @@ async function con(cambios, fn) {
     assert.strictEqual(alGrupo.filter((t) => /^(💰|❌|❓)/.test(t)).length, 0);
   });
 
-  console.log('\nEn el resumen de la mañana\n');
-
-  // Lunes 14 de septiembre de 2026 a las 9:05: "ayer" es el domingo 13.
-  const HOY = new Date(2026, 8, 14, 9, 5);
-  const el = (dia, h, m = 0) => new Date(2026, 8, dia, h, m).getTime();
-  const marcado = (tipo, ts, botParticipo, botLeMando = false) => ({
-    historial: [],
-    resultado: { tipo, ts, botParticipo, botLeMando },
-  });
-  const AYER = {
-    '5491100000101@s.whatsapp.net': marcado('vendido', el(13, 0, 0), true, true), // borde: 0:00 de ayer
-    '5491100000102@s.whatsapp.net': marcado('vendido', el(13, 18, 30), true),
-    '5491100000103@s.whatsapp.net': marcado('vendido', el(13, 23, 59), false),
-    '5491100000104@s.whatsapp.net': marcado('perdido', el(13, 11), true),
-    '5491100000105@s.whatsapp.net': marcado('vendido', el(14, 8), true, true), // hoy
-    '5491100000106@s.whatsapp.net': marcado('vendido', el(12, 23, 59), true, true), // anteayer
-    '5491100000107@s.whatsapp.net': { historial: [] }, // sin marcar
-  };
-
-  await check('cuenta solo los del día anterior, en cuántos propuso y en cuántos le mandó', () => {
-    assert.deepStrictEqual(resumen.resultadosDeAyer(AYER, HOY), {
-      vendido: { total: 3, conBot: 2, conEnvio: 1 },
-      perdido: { total: 1, conBot: 1, conEnvio: 0 },
-    });
-  });
-
-  await check('la línea de "le mandó" va debajo de su fila y solo si no es cero', () => {
-    const texto = resumen.armar(AYER, 3, HOY).join('\n');
-    assert.ok(texto.includes('📊 Ayer, domingo 13'), texto.slice(0, 120));
-    assert.ok(
-      texto.includes('💰 3 vendidos · el bot participó en 2\n   📤 le mandó mensajes en 1\n❌ 1 perdido · el bot participó en 1\n'),
-      texto.slice(0, 200)
-    );
-    assert.strictEqual((texto.match(/📤/g) || []).length, 1, 'puso la línea de "le mandó" en cero');
-  });
-
-  await check('los contactos personales no cuentan, como en el resto del resumen', async () => {
-    const chat = '5491100000108@s.whatsapp.net';
-    await con({ contactosPersonales: [tel(chat)] }, () => {
-      assert.strictEqual(resumen.resultadosDeAyer({ [chat]: marcado('vendido', el(13, 12), true) }, HOY).vendido.total, 0);
-    });
-  });
-
-  await check('sin nada pendiente igual salen las cuentas de ayer', () => {
-    const partes = resumen.armar({ '5491100000109@s.whatsapp.net': marcado('perdido', el(13, 12), false) }, 3, HOY);
-    assert.strictEqual(partes.length, 1);
-    assert.ok(/❌ 1 perdido · el bot participó en 0\n/.test(partes[0]), partes[0]);
-    assert.ok(!/📤/.test(partes[0]), partes[0]);
-    assert.ok(/No hay nada pendiente/.test(partes[0]), partes[0]);
-  });
-
-  // Hasta Ajustes 1 (16/09/2026) decía "💰 0 vendidos" y recordaba cómo se anotan.
-  // Nadie los anotaba: ahora, con los dos en cero, no sale nada (ver test/turnos.test.js).
-  await check('con los dos en cero no sale la línea de vendidos ni el recordatorio de cómo se anotan', () => {
-    const texto = resumen.armar({}, 3, HOY)[0];
-    assert.ok(!/📊|💰|❌|vendido|perdido/.test(texto), texto);
-    assert.ok(!texto.includes('Se anotan con'), texto);
-  });
-
-  await check('un chat marcado sale de los pendientes; si el cliente escribe después de marcarlo, vuelve', () => {
-    const t = Date.now();
-    const hace = (h) => t - h * 3600 * 1000;
-    const cotizado = (extra) => ({
-      nombre: 'Cliente',
-      modelo: 'iPhone 13',
-      cotizadoDe: 'iPhone 13',
-      ultimoBot: hace(2),
-      historial: [{ quien: 'cliente', texto: 'tengo 400 mil', ts: hace(3) }],
-      ...extra,
-    });
-    const todos = {
-      '5491100000201@s.whatsapp.net': cotizado({}), // sin marcar
-      '5491100000202@s.whatsapp.net': cotizado({ resultado: { tipo: 'vendido', ts: hace(1) } }),
-      '5491100000203@s.whatsapp.net': cotizado({ escalado: true, resultado: { tipo: 'perdido', ts: hace(1) } }),
-      '5491100000204@s.whatsapp.net': cotizado({
-        resultado: { tipo: 'perdido', ts: hace(1) },
-        historial: [{ quien: 'cliente', texto: 'che al final lo quiero', ts: hace(0.2) }],
-      }),
-    };
-    const texto = resumen.armar(todos, 3).join('\n');
-    assert.ok(/2 chats para mirar/.test(texto), texto.slice(0, 200));
-    assert.ok(texto.includes('wa.me/5491100000201'), 'se perdió el chat sin marcar');
-    assert.ok(!texto.includes('wa.me/5491100000202'), 'el vendido sigue en PARA CERRAR');
-    assert.ok(!texto.includes('wa.me/5491100000203'), 'el perdido sigue en TE ESTÁN ESPERANDO');
-    assert.ok(texto.includes('wa.me/5491100000204') && texto.includes('che al final lo quiero'), 'el que volvió a escribir no está');
-  });
-
-  await check('de punta a punta: un #vendido de hoy sale en el resumen de mañana', async () => {
-    const chat = await chatConBot();
-    await bot.procesar(mio(chat, '#vendido'));
-    const ahora = new Date();
-    const manana = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate() + 1, 9, 5);
-    const soloEste = { [chat]: state.todos()[chat] };
-    assert.deepStrictEqual(resumen.resultadosDeAyer(soloEste, manana).vendido, { total: 1, conBot: 1, conEnvio: 1 });
-    assert.strictEqual(resumen.resultadosDeAyer(soloEste, ahora).vendido.total, 0, 'lo contó en el resumen de hoy');
-  });
-
-  console.log('\nChats marcados que vuelven, y el seguimiento\n');
-
-  await check('un chat marcado que vuelve dice al lado del nombre por qué vuelve', () => {
-    const HOY14 = new Date(2026, 8, 14, 9, 5);
-    const el = (mes, dia, h = 12) => new Date(2026, mes, dia, h).getTime();
-    // Todos escribieron después de la marca y nadie les contestó: van a ESCRIBIERON Y NADIE CONTESTÓ.
-    const escribio = { quien: 'cliente', texto: 'hola, sigue en pie?', ts: HOY14.getTime() - 60 * 1000 };
-    const volvio = (nombre, resultado) => ({
-      nombre,
-      modelo: 'iPhone 13',
-      ultimoBot: resultado.ts - 3600 * 1000,
-      historial: [escribio],
-      resultado,
-    });
-    const todos = {
-      '5491100000301@s.whatsapp.net': volvio('Ana', { tipo: 'vendido', ts: el(8, 14, 8) }), // hoy, antes del resumen
-      '5491100000302@s.whatsapp.net': volvio('Beto', { tipo: 'vendido', ts: el(8, 13) }), // ayer
-      '5491100000303@s.whatsapp.net': volvio('Caro', { tipo: 'perdido', ts: el(8, 12) }), // este mes
-      '5491100000304@s.whatsapp.net': volvio('Dani', { tipo: 'vendido', ts: el(7, 30) }), // el mes pasado
-      '5491100000305@s.whatsapp.net': { nombre: 'Eli', modelo: 'iPhone 13', ultimoBot: el(8, 14, 7), historial: [escribio] },
-    };
-    const texto = resumen.armar(todos, 3, HOY14).join('\n');
-    for (const esperado of ['Ana (vendido hoy) · 13', 'Beto (vendido ayer) · 13', 'Caro (perdido el 12) · 13', 'Dani (vendido el 30/08) · 13']) {
-      assert.ok(texto.includes(esperado), `falta "${esperado}" en:\n${texto}`);
-    }
-    assert.ok(/\d\) Eli · 13/.test(texto), 'un chat sin marcar no tendría que llevar nada al lado del nombre:\n' + texto);
-  });
-
-  await check('el seguimiento saltea los chats marcados, aunque el cliente haya vuelto a escribir', async () => {
-    const hace = (h) => Date.now() - h * 3600 * 1000;
-    // El bot le escribió último hace 2 horas y el cliente no contestó: un plantón.
-    const planton = (extra) => ({
-      modelo: 'iPhone 13',
-      botPropuso: hace(3),
-      ultimoBot: hace(2),
-      ultimoEnvioCliente: hace(2),
-      // Bloque Ninjo 1b: el seguimiento sale 3 h después de un precio del bot que le llegó.
-      ultimoPrecioBot: hace(3.5),
-      historial: [{ quien: 'cliente', texto: 'tenes el 13?', ts: hace(4) }],
-      ...extra,
-    });
-    const libre = nuevoChat();
-    const vendido = nuevoChat();
-    const perdidoQueVolvio = nuevoChat(); // lo marcaron hace 5 h y escribió hace 3
-    state.actualizar(libre, planton({}));
-    state.actualizar(vendido, planton({ resultado: { tipo: 'vendido', ts: hace(4) } }));
-    state.actualizar(perdidoQueVolvio, planton({ resultado: { tipo: 'perdido', ts: hace(5) } }));
-    limpiar();
-    const seguimiento = { ...config.seguimiento, activo: true, horaDesde: 0, horaHasta: 24, franjaDesde: 0, franjaHasta: 24, maxPorBarrido: 10 };
-    await con({ seguimiento }, () => bot.revisarSeguimientos({ escribiendoMs: 1 }));
-    assert.ok(aClientes.some((m) => m.numero === libre), 'el caso no prueba nada: al chat sin marcar no le salió el seguimiento');
-    assert.ok(!aClientes.some((m) => m.numero === vendido), 'le mandó el seguimiento a un vendido');
-    assert.ok(!aClientes.some((m) => m.numero === perdidoQueVolvio), 'le mandó el seguimiento a un perdido que volvió');
-  });
-
   console.log('\nEl eco del propio bot\n');
 
-  await check('nada de lo que el bot manda al grupo (ni el resumen) dispara un comando al volver', async () => {
-    const mandados = [...historialGrupo, ...resumen.armar(AYER, 3, HOY), ...resumen.armar({}, 3, HOY)];
-    for (const tipo of [/^💰/, /^❌/, /^❓ Desde el grupo/, /^❓ Hay 2 chats/, /wa\.me/, /📤/, /📅/]) {
+  await check('nada de lo que el bot manda al grupo dispara un comando al volver', async () => {
+    const mandados = [...historialGrupo];
+    for (const tipo of [/^💰/, /^❌/, /^❓ Desde el grupo/, /^❓ Hay 2 chats/, /wa\.me/]) {
       assert.ok(mandados.some((t) => tipo.test(t)), 'el caso no prueba nada: no hay avisos ' + tipo);
     }
     for (const t of mandados) {

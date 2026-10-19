@@ -101,9 +101,6 @@ globalThis.fetch = async (url, opciones = {}) => {
   return ok({});
 };
 
-const sheets = require('../src/sheets');
-sheets.usarFixture(require('./fixture-planilla'));
-sheets.registrarLead = async () => {};
 
 const config = require('../src/config');
 const evolution = require('../src/evolution');

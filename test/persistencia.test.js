@@ -55,6 +55,7 @@ process.env.RESUMEN_ACTIVO = 'false';
 process.env.WEBHOOK_SECRETO = '';
 process.env.HOST = '';
 process.env.ESTADO_SOLO_LECTURA = '';
+process.env.EVOLUTION_INSTANCE = 'somospiedra';
 process.env.ESTADO_PATH = path.join(DIR, 'estado.json');
 // Cerebro Sonnet (01/10/2026): apagado, para no heredar `sombra` del .env real.
 process.env.CEREBRO_MODO = 'apagado';
@@ -71,9 +72,6 @@ console.error = (...args) => {
   errorOriginal(...args);
 };
 
-const sheets = require('../src/sheets');
-sheets.usarFixture(require('./fixture-planilla'));
-sheets.registrarLead = async () => {};
 globalThis.fetch = () => {
   throw new Error('salió a la red durante la prueba');
 };
@@ -296,13 +294,13 @@ const CARGAR_Y_SALIR_SOLO = `const s = require(${JSON.stringify(STATE_JS)}); s.t
 
   await check('cargar un estado viejo, leer y salir: mismo contenido, misma fecha, sin backup .antes-bloque3', async () => {
     const archivo = path.join(DIR, 'lector.json');
-    const viejo = { '5490000000004@s.whatsapp.net': { nombre: 'Ana', listaEnviada: true, cotizadoDe: 'iPhone 13' } };
+    const viejo = { '5490000000004@s.whatsapp.net': { nombre: 'Ana', saludoEn: 1700000000000, acuseContestado: { ts: 1, texto: 'ok' } } };
     fs.writeFileSync(archivo, JSON.stringify(viejo, null, 2));
     const contenido = leer(archivo);
     const fecha = mtime(archivo);
     await dormir(30);
     const salida = enOtroProceso(
-      `const s = require(${JSON.stringify(STATE_JS)}); const c = s.todos()['5490000000004@s.whatsapp.net']; process.stdout.write(JSON.stringify({ lista: c.listaEnviada || null, cot: c.cotizadoDe || null, nombre: c.nombre })); s.actualizar('5490000000004@s.whatsapp.net', { entrega: 1 }); s.guardarAhora(); process.emit('SIGINT');`,
+      `const s = require(${JSON.stringify(STATE_JS)}); const c = s.todos()['5490000000004@s.whatsapp.net']; process.stdout.write(JSON.stringify({ lista: c.saludoEn || null, cot: c.acuseContestado || null, nombre: c.nombre })); s.actualizar('5490000000004@s.whatsapp.net', { entrega: 1 }); s.guardarAhora(); process.emit('SIGINT');`,
       archivo,
       { ESTADO_SOLO_LECTURA: '1' }
     );
@@ -458,12 +456,12 @@ const CARGAR_Y_SALIR_SOLO = `const s = require(${JSON.stringify(STATE_JS)}); s.t
 
   await check('con escritura: migra, hace el backup una sola vez y no lo pisa', async () => {
     const archivo = path.join(DIR, 'migra.json');
-    const viejo = { '5490000000005@s.whatsapp.net': { nombre: 'Leo', listaEnviada: true } };
+    const viejo = { '5490000000005@s.whatsapp.net': { nombre: 'Leo', saludoEn: 1700000000000 } };
     fs.writeFileSync(archivo, JSON.stringify(viejo));
     enOtroProceso(CARGAR_Y_SALIR, archivo);
     assert.deepStrictEqual(JSON.parse(leer(archivo + '.antes-bloque3')), viejo, 'el backup no es el original');
     const migrado = JSON.parse(leer(archivo));
-    assert.ok(!migrado['5490000000005@s.whatsapp.net'].listaEnviada, 'no migró');
+    assert.ok(!migrado['5490000000005@s.whatsapp.net'].saludoEn, 'no migró');
     assert.strictEqual(migrado['bot:interno'].esquema, 3);
     fs.writeFileSync(archivo + '.antes-bloque3.control', leer(archivo + '.antes-bloque3'));
     enOtroProceso(CARGAR_Y_SALIR, archivo);

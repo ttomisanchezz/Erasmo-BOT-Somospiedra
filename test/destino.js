@@ -133,7 +133,7 @@ function comoSacarElJidDelGrupo() {
   console.log('  Mandando mensaje de prueba...');
   try {
     const r = await evolution.avisarGrupo(
-      '🔧 Prueba del bot de Somos iPhone NQN. Si ves esto, los avisos llegan bien.'
+      '🔧 Prueba del bot de Somos Piedra. Si ves esto, los avisos llegan bien.'
     );
     // `avisarGrupo` no tira excepción cuando frena: devuelve {bloqueado, motivo},
     // o `undefined` si cortó por destino vacío o por chat de cliente. Nunca se

@@ -53,6 +53,7 @@ process.env.FOTOS_DIR = path.join(TMP, 'sin-fotos');
 process.env.DOCS_DIR = path.join(TMP, 'documentos');
 fs.mkdirSync(process.env.DOCS_DIR);
 fs.writeFileSync(path.join(process.env.DOCS_DIR, 'compromiso-de-pago.pdf'), '%PDF de mentira');
+process.env.EVOLUTION_INSTANCE = 'somospiedra';
 process.env.ESTADO_PATH = path.join(TMP, 'estado.json');
 process.env.APRENDIZAJE_PATH = path.join(TMP, 'aprendizaje.jsonl');
 process.env.CEREBRO_MODO = 'todos';
@@ -91,10 +92,6 @@ globalThis.fetch = async (url, opciones = {}) => {
 const textoDelPedido = (i) => pedidos[i].body.messages[0].content.map((b) => b.text || '').join('\n');
 
 // El bot, sin red.
-const sheets = require('../src/sheets');
-const fixture = require('./fixture-planilla');
-sheets.usarFixture(fixture);
-sheets.registrarLead = async () => {};
 const gemini = require('../src/gemini');
 gemini.usarSoloLocal(true);
 const evolution = require('../src/evolution');

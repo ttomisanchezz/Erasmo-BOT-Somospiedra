@@ -55,14 +55,14 @@ process.env.WEBHOOK_SECRETO = '';
 process.env.WEBHOOK_MAX_POR_MINUTO = '600';
 process.env.HOST = '';
 process.env.ESTADO_SOLO_LECTURA = '';
+process.env.EVOLUTION_INSTANCE = 'somospiedra';
 process.env.ESTADO_PATH = path.join(os.tmpdir(), 'estado-dedupe-' + process.pid + '.json');
 // Cerebro Sonnet (01/10/2026): apagado, para no heredar `sombra` del .env real.
-process.env.CEREBRO_MODO = 'apagado';
+process.env.CEREBRO_MODO = 'todos';
+process.env.ANTHROPIC_API_KEY = 'clave-de-mentira';
+process.env.CEREBRO_SOMBRA_PERSONA_HASTA = '';
 process.env.APRENDIZAJE_PATH = path.join(os.tmpdir(), 'apr-dedupe-' + process.pid + '.jsonl');
 
-const sheets = require('../src/sheets');
-sheets.usarFixture(require('./fixture-planilla'));
-sheets.registrarLead = async () => {};
 globalThis.fetch = () => {
   throw new Error('salió a la red durante la prueba');
 };
@@ -80,6 +80,8 @@ evolution.enviarDocumento = async (numero) => respuesta(numero);
 evolution.avisarGrupo = async () => ({ key: { id: 'G' } });
 evolution.estadoInstancia = async () => ({ state: 'open' });
 
+// Sin bot de siempre (poda de iPhone): contesta un Sonnet de mentira (test/sonnet-fijo.js).
+const sonnetFijo = require('./sonnet-fijo').instalar();
 const bot = require('../src/index');
 const state = require('../src/state');
 
@@ -98,7 +100,7 @@ let n = 0;
 const nuevoChat = () => '54900000' + String(n++).padStart(5, '0') + '@s.whatsapp.net';
 const evento = (chatId, texto, id, { fromMe = false } = {}) => ({
   event: 'messages.upsert',
-  instance: 'somosiphone',
+  instance: 'somospiedra',
   data: {
     key: { remoteJid: chatId, fromMe, id },
     pushName: 'Lucia',
@@ -177,7 +179,7 @@ async function webhook(cuerpo, espera = 120) {
     const chat = nuevoChat();
     await webhook(evento(chat, 'tenes el 13?', 'LOTE-1'));
     const antes = historialDe(chat).filter((l) => l.quien === 'cliente').length;
-    const lote = { event: 'messages.upsert', instance: 'somosiphone', data: [evento(chat, 'tenes el 13?', 'LOTE-1').data, evento(chat, 'y el 15?', 'LOTE-2').data] };
+    const lote = { event: 'messages.upsert', instance: 'somospiedra', data: [evento(chat, 'tenes el 13?', 'LOTE-1').data, evento(chat, 'y el 15?', 'LOTE-2').data] };
     await webhook(lote, 200);
     const cliente = historialDe(chat).filter((l) => l.quien === 'cliente');
     assert.strictEqual(cliente.length, antes + 1, 'procesó el repetido del lote: ' + cliente.map((l) => l.texto).join(' | '));

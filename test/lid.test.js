@@ -33,13 +33,14 @@ process.env.SOLO_CHATS_NUEVOS = '';
 process.env.AUDIO_ACTIVO = 'true';
 process.env.CONTACTOS_PERSONALES = '';
 process.env.GRUPO_AVISOS_JID = '120363000000000000@g.us';
+process.env.EVOLUTION_INSTANCE = 'somospiedra';
 process.env.ESTADO_PATH = path.join(os.tmpdir(), 'estado-lid-' + Date.now() + '.json');
 // Cerebro Sonnet (01/10/2026): apagado, para no heredar `sombra` del .env real.
-process.env.CEREBRO_MODO = 'apagado';
+process.env.CEREBRO_MODO = 'todos';
+process.env.ANTHROPIC_API_KEY = 'clave-de-mentira';
+process.env.CEREBRO_SOMBRA_PERSONA_HASTA = '';
 process.env.APRENDIZAJE_PATH = path.join(os.tmpdir(), 'apr-lid-' + Date.now() + '.jsonl');
 
-const sheets = require('../src/sheets');
-sheets.usarFixture(require('./fixture-planilla'));
 
 const config = require('../src/config');
 const evolution = require('../src/evolution');
@@ -49,14 +50,8 @@ globalThis.fetch = () => {
   throw new Error('salió a la red durante la prueba');
 };
 
-let llamadasAGemini = 0;
 let pedidosDeAudio = 0;
-const local = require('../src/extractor-local');
-gemini.entender = async (h, m) => {
-  llamadasAGemini++;
-  return local.entender(m);
-};
-gemini.transcribir = async () => 'hola tenes el iphone 13';
+gemini.transcribir = async () => 'hola tienen laja';
 evolution.base64DeMedia = async () => {
   pedidosDeAudio++;
   return { base64: 'AAAA', mimetype: 'audio/ogg' };
@@ -81,6 +76,8 @@ evolution.avisarGrupo = async (t) => {
 };
 evolution.estadoInstancia = async () => ({ state: 'open' });
 
+// Sin bot de siempre (poda de iPhone): contesta un Sonnet de mentira (test/sonnet-fijo.js).
+const sonnetFijo = require('./sonnet-fijo').instalar();
 const bot = require('../src/index');
 const state = require('../src/state');
 const aprendizaje = require('../src/aprendizaje');
@@ -122,7 +119,7 @@ const notaDeVoz = (chatId) => ({
 function limpiar() {
   aClientes.length = 0;
   alGrupo.length = 0;
-  llamadasAGemini = 0;
+  sonnetFijo.llamadas.length = 0;
   pedidosDeAudio = 0;
 }
 
@@ -136,12 +133,12 @@ const HORA_AR = new Intl.DateTimeFormat('es-AR', {
 (async () => {
   console.log('\nUn chat que llega como @lid no se procesa\n');
 
-  await check('no se le contesta ni va a Gemini', async () => {
+  await check('no se le contesta ni va a Sonnet', async () => {
     limpiar();
-    await bot.procesar(escrito(LID, 'hola tenes el iphone 13? tengo 500 mil'));
+    await bot.procesar(escrito(LID, 'hola tienen laja? tengo 500 mil'));
     await dormir(200);
     assert.strictEqual(aClientes.length, 0, 'le contestó a un chat sin número');
-    assert.strictEqual(llamadasAGemini, 0, 'gastó una llamada a Gemini');
+    assert.strictEqual(sonnetFijo.llamadas.length, 0, 'gastó una llamada a Sonnet');
   });
 
   await check('no se guarda en estado.json', () => {
@@ -152,13 +149,13 @@ const HORA_AR = new Intl.DateTimeFormat('es-AR', {
   await check('avisa al grupo una vez, con el nombre y la hora, sin el texto', async () => {
     limpiar();
     const ts = Math.floor(Date.now() / 1000) - 60;
-    await bot.procesar(escrito(LID_2, 'hola tenes el iphone 13? tengo 500 mil', { messageTimestamp: ts }));
+    await bot.procesar(escrito(LID_2, 'hola tienen laja? tengo 500 mil', { messageTimestamp: ts }));
     await dormir(100);
     assert.strictEqual(alGrupo.length, 1, `avisos: ${alGrupo.length}`);
     const aviso = alGrupo[0];
     assert.ok(aviso.includes('Marta'), 'el aviso no dice el nombre: ' + aviso);
     assert.ok(aviso.includes(HORA_AR.format(ts * 1000)), 'el aviso no dice la hora del mensaje: ' + aviso);
-    assert.ok(!/iphone|500/i.test(aviso), 'el aviso muestra el texto del mensaje: ' + aviso);
+    assert.ok(!/laja|500/i.test(aviso), 'el aviso muestra el texto del mensaje: ' + aviso);
     assert.ok(!aviso.includes('10000000000002'), 'el aviso muestra el identificador interno: ' + aviso);
   });
 
@@ -245,7 +242,7 @@ const HORA_AR = new Intl.DateTimeFormat('es-AR', {
       await bot.procesar(escrito(LID, 'tenes el 14 pro?'));
       await dormir(200);
       assert.strictEqual(aClientes.length, 0, 'le contestó en vivo a un chat sin número');
-      assert.strictEqual(llamadasAGemini, 0);
+      assert.strictEqual(sonnetFijo.llamadas.length, 0);
       assert.ok(!state.todos()[LID]);
     } finally {
       Object.assign(config, antes);
@@ -256,10 +253,10 @@ const HORA_AR = new Intl.DateTimeFormat('es-AR', {
 
   await check('un cliente con número recibe respuesta', async () => {
     limpiar();
-    await bot.procesar(escrito(CLIENTE, 'hola tenes el iphone 13?'));
+    await bot.procesar(escrito(CLIENTE, 'hola tienen laja?'));
     await dormir(250);
     assert.ok(aClientes.length > 0, 'dejó de contestarle a un cliente con número');
-    assert.ok(llamadasAGemini > 0, 'no analizó el mensaje de un cliente');
+    assert.ok(sonnetFijo.llamadas.length > 0, 'no le preguntó a Sonnet por un cliente');
     assert.ok(state.todos()[CLIENTE], 'no guardó el chat de un cliente');
     assert.ok(!alGrupo.some((t) => /sin (el )?n[uú]mero/i.test(t)), 'avisó "sin número" por un chat con número');
   });

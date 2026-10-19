@@ -61,6 +61,9 @@ function psql(sql) {
  * remoteJidAlt de sus mensajes, la fecha del más viejo y cuántos tiene) y `mapaLid`.
  */
 function leerBase({ instancia = config.evolution.instancia } = {}) {
+  // Poda de iPhone (19/10/2026): Evolution es compartido; nunca la instancia vacía ni la de Somos iPhone.
+  const problema = config.problemaDeInstancia(instancia);
+  if (problema) throw new Error(`${problema}: no siembro nada`);
   if (!/^[\w.-]+$/.test(instancia)) throw new Error(`nombre de instancia raro: ${instancia}`);
   const fila = psql(`SELECT id FROM "Instance" WHERE name = '${instancia}';`)[0];
   const id = fila && fila[0];

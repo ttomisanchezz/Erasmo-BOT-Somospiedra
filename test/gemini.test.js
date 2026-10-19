@@ -4,8 +4,8 @@
  *
  * En el tier gratuito Google puede usar lo que le mandamos para entrenar sus
  * modelos, así que el nombre del cliente, su teléfono y su mail se tachan
- * antes de salir. Lo que NO se puede tachar es el monto que dijo tener: si se
- * borra, el bot deja de poder cotizar.
+ * antes de salir (también lo usa cerebro.js para lo que va a Anthropic). Lo que
+ * NO se puede tachar es un monto o una medida que dijo el cliente.
  */
 const assert = require('assert');
 
@@ -61,8 +61,8 @@ check('NO toca el monto de la entrega', () => {
   assert.ok(sinDatosPersonales('junte 250 mil', 'Tomas').includes('250'));
 });
 
-check('NO toca el modelo ni la batería', () => {
-  const t = sinDatosPersonales('queria el iphone 13 128gb de 100%', 'Tomas');
+check('NO toca las medidas ni los números del producto', () => {
+  const t = sinDatosPersonales('queria laja de 13 cm, 128 m2 al 100%', 'Tomas');
   assert.ok(t.includes('13') && t.includes('128') && t.includes('100'), t);
 });
 
@@ -71,19 +71,12 @@ check('sin nombre no rompe', () => {
   assert.strictEqual(sinDatosPersonales('tenes el 14?', null), 'tenes el 14?');
 });
 
-// Lo que dijo una persona de la cuenta (01/10/2026, decisión de Tomás; caso Jazz). Va en su
-// propia sección, con cuándo lo dijo y tachada igual que el resto, y Gemini devuelve en la misma
-// llamada la frase que el cliente está siguiendo (`dijo_persona`). Gemini se simula: no sale
-// nada a la red.
+// Desde la poda de iPhone (19/10/2026) Gemini solo transcribe audios (entender y redactar se fueron con
+// el bot de siempre). Gemini se simula: no sale nada a la red.
 (async () => {
-  console.log('\nLo que dijo una persona de la cuenta (01/10/2026):');
+  console.log('\nTranscribir (lo único que hace Gemini):');
   const gemini = require('../src/gemini');
-  const HORA = 60 * 60 * 1000;
   let cuerpo = null;
-  const lee = (obj) => async (url, opciones) => {
-    cuerpo = JSON.parse(opciones.body);
-    return { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify(obj) }] } }] }) };
-  };
   async function checkAsync(nombre, fn) {
     try {
       await fn();
@@ -93,49 +86,24 @@ check('sin nombre no rompe', () => {
       console.log('  FALLA ' + nombre + ' -> ' + e.message);
     }
   }
-  const PERSONAS = [{ texto: 'mañana entran iphones 13, tomas te escribe del 2994123456', ts: Date.now() - 20 * HORA }];
-  const SECCION = 'Lo que escribió una persona de la cuenta (no el bot)';
 
-  await checkAsync('las líneas de la persona van aparte, con cuándo, y sin nombre ni teléfono', async () => {
-    globalThis.fetch = lee({ intencion: 'consulta_stock', modelo: '13', modelos: ['13'] });
-    await gemini.entender('Cliente: tenes el 13?\nPersona de la cuenta: mañana entran', 'hola entraron los 13?', 'Tomas', PERSONAS);
-    const prompt = cuerpo.contents[0].parts[0].text;
-    const partes = prompt.split(SECCION);
-    assert.strictEqual(partes.length, 2, 'no va la sección: ' + prompt.slice(-600));
-    const seccion = partes[1].split('Último mensaje del cliente')[0];
-    assert.ok(seccion.includes('mañana entran iphones 13'), 'no va la línea de la persona: ' + seccion);
-    assert.ok(seccion.includes('hace 20 h'), 'no dice cuándo: ' + seccion);
-    assert.ok(!/tomas/i.test(seccion) && !seccion.includes('2994123456'), 'salió el nombre o el teléfono: ' + seccion);
-  });
-
-  await checkAsync('el esquema pide dijo_persona y vuelve en la lectura, en la misma llamada', async () => {
-    let llamadas = 0;
-    const leer = lee({ intencion: 'consulta_stock', modelo: '13', modelos: ['13'], dijo_persona: 'mañana entran iphones 13' });
-    globalThis.fetch = async (...a) => {
-      llamadas++;
-      return leer(...a);
+  await checkAsync('manda el audio y pide solo la transcripción, sin nada de iPhone', async () => {
+    globalThis.fetch = async (url, opciones) => {
+      cuerpo = JSON.parse(opciones.body);
+      return { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: 'hola, tienen laja?' }] }, finishReason: 'STOP' }] }) };
     };
-    const info = await gemini.entender('', 'hola entraron los 13?', '', PERSONAS);
-    assert.strictEqual(llamadas, 1);
-    assert.ok(cuerpo.generationConfig.responseSchema.properties.dijo_persona, 'el esquema no tiene dijo_persona');
-    assert.ok(/dijo_persona/.test(cuerpo.contents[0].parts[0].text), 'el prompt no explica dijo_persona');
-    assert.strictEqual(info.dijo_persona, 'mañana entran iphones 13');
+    const texto = await gemini.transcribir({ base64: 'AAAA', mimetype: 'audio/ogg' });
+    assert.strictEqual(texto, 'hola, tienen laja?');
+    const partes = cuerpo.contents[0].parts;
+    assert.ok(partes.some((x) => x.inline_data && x.inline_data.data === 'AAAA'), 'no mandó el audio');
+    const prompt = partes[0].text;
+    assert.ok(prompt.includes(gemini.INAUDIBLE), 'no pide la marca de inaudible');
+    assert.ok(!/iphone|celular|venta de/i.test(prompt), 'el prompt habla de iPhone: ' + prompt);
   });
 
-  await checkAsync('sin líneas de persona no va la sección', async () => {
-    globalThis.fetch = lee({ intencion: 'consulta_stock', modelo: '13', modelos: ['13'] });
-    const info = await gemini.entender('', 'tenes el 13?', '');
-    assert.ok(!cuerpo.contents[0].parts[0].text.includes(SECCION), 'fue la sección sin líneas');
-    assert.strictEqual(info.dijo_persona, null);
-  });
-
-  await checkAsync('si Gemini falla, la lectura del extractor local sale marcada como falla', async () => {
-    globalThis.fetch = async () => {
-      throw new Error('sin red');
-    };
-    const info = await gemini.entender('', 'tenes el 13?', '', PERSONAS);
-    assert.strictEqual(info._fuente, 'local');
-    assert.strictEqual(info._geminiFallo, true);
+  await checkAsync('ya no existen entender ni redactar', async () => {
+    assert.strictEqual(gemini.entender, undefined);
+    assert.strictEqual(gemini.redactar, undefined);
   });
 
   console.log(fallos === 0 ? '\nTodo OK\n' : `\n${fallos} fallo(s)\n`);

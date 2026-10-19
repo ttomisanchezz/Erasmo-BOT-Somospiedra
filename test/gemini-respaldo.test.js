@@ -12,7 +12,8 @@
  * (404) o se quedó sin cupo del día (429 por día), un solo intento.
  *
  * Gemini se simula con un fetch de mentira: no sale nada a la red. El entorno
- * se fija acá y no se hereda del .env.
+ * se fija acá y no se hereda del .env. Desde la poda de iPhone (19/10/2026) Gemini solo
+ * transcribe: se prueba con `llamar` directo (antes con `entender`, que se fue).
  */
 const assert = require('assert');
 const fs = require('fs');
@@ -28,7 +29,7 @@ process.env.APRENDIZAJE_PATH = path.join(os.tmpdir(), 'apr-respaldo-' + process.
 
 const gemini = require('../src/gemini');
 
-const LECTURA = JSON.stringify({ intencion: 'consulta_stock', modelo: '13', modelos: ['13'], entrega: null });
+const LECTURA = 'hola, tienen laja?';
 const ok = (texto) => ({ ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: texto }] } }] }) });
 
 /** Qué modelos se pidieron, en orden. */
@@ -56,10 +57,9 @@ async function check(nombre, fn) {
       if (modeloDe(url) === 'principal-de-prueba') throw new Error('sin red');
       return ok(LECTURA);
     };
-    const info = await gemini.entender('', 'tenes el 13?', '');
+    const texto = await gemini.llamar('transcribí');
     assert.deepStrictEqual(pedidos, ['principal-de-prueba', 'respaldo-de-prueba']);
-    assert.strictEqual(info._fuente, 'gemini', 'no leyó con el respaldo');
-    assert.strictEqual(info.modelo, '13');
+    assert.strictEqual(texto, LECTURA, 'no contestó el respaldo');
   });
 
   await check('el principal está saturado (503): el reintento también va al respaldo', async () => {
@@ -69,9 +69,9 @@ async function check(nombre, fn) {
       if (modeloDe(url) === 'principal-de-prueba') return { ok: false, status: 503, text: async () => 'saturado' };
       return ok(LECTURA);
     };
-    const info = await gemini.entender('', 'tenes el 13?', '');
+    const texto = await gemini.llamar('transcribí');
     assert.deepStrictEqual(pedidos, ['principal-de-prueba', 'respaldo-de-prueba']);
-    assert.strictEqual(info._fuente, 'gemini');
+    assert.strictEqual(texto, LECTURA, 'no contestó el respaldo');
   });
 
   // Arreglos en vivo (30/09/2026): el respaldo es otro modelo con su propio cupo. Si el
@@ -86,10 +86,9 @@ async function check(nombre, fn) {
       pedidos.push(modeloDe(url));
       return modeloDe(url) === 'principal-de-prueba' ? NO_EXISTE : ok(LECTURA);
     };
-    const info = await gemini.entender('', 'tenes el 13?', '');
+    const texto = await gemini.llamar('transcribí');
     assert.deepStrictEqual(pedidos, ['principal-de-prueba', 'respaldo-de-prueba']);
-    assert.strictEqual(info._fuente, 'gemini', 'no leyó con el respaldo');
-    assert.strictEqual(info.modelo, '13');
+    assert.strictEqual(texto, LECTURA, 'no contestó el respaldo');
   });
 
   await check('el principal se quedó sin cupo del día (429 por día): un intento con el respaldo, que responde', async () => {
@@ -98,12 +97,12 @@ async function check(nombre, fn) {
       pedidos.push(modeloDe(url));
       return modeloDe(url) === 'principal-de-prueba' ? SIN_CUPO_DIARIO : ok(LECTURA);
     };
-    const info = await gemini.entender('', 'tenes el 13?', '');
+    const texto = await gemini.llamar('transcribí');
     assert.deepStrictEqual(pedidos, ['principal-de-prueba', 'respaldo-de-prueba']);
-    assert.strictEqual(info._fuente, 'gemini', 'no leyó con el respaldo');
+    assert.strictEqual(texto, LECTURA, 'no contestó el respaldo');
   });
 
-  await check('sin cupo del día en los dos: error con el motivo, un solo intento con el respaldo, y sigue el extractor local', async () => {
+  await check('sin cupo del día en los dos: error con el motivo y un solo intento con el respaldo', async () => {
     pedidos = [];
     globalThis.fetch = async (url) => {
       pedidos.push(modeloDe(url));
@@ -112,14 +111,9 @@ async function check(nombre, fn) {
     await assert.rejects(gemini.llamar('hola'), (e) => {
       assert.match(e.message, /Gemini 429 \(respaldo-de-prueba\)/, e.message);
       assert.match(e.message, /principal-de-prueba/, 'no dice que el principal tampoco tenía cupo: ' + e.message);
-      assert.match(e.message, /extractor local/, e.message);
       return true;
     });
     assert.deepStrictEqual(pedidos, ['principal-de-prueba', 'respaldo-de-prueba'], 'el 429 por día del respaldo no se reintenta');
-    pedidos = [];
-    const info = await gemini.entender('', 'tenes el 13?', '');
-    assert.strictEqual(info._fuente, 'local');
-    assert.deepStrictEqual(pedidos, ['principal-de-prueba', 'respaldo-de-prueba']);
   });
 
   await check('el principal no existe y el respaldo tampoco: error, sin un tercer pedido', async () => {

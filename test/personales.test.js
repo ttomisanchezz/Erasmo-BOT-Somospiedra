@@ -27,31 +27,29 @@ process.env.NUMEROS_TESTER = '';
 process.env.NUMEROS_PILOTO = '';
 process.env.AUDIO_ACTIVO = 'true';
 process.env.CONTACTOS_PERSONALES = '';
+process.env.EVOLUTION_INSTANCE = 'somospiedra';
 process.env.ESTADO_PATH = path.join(os.tmpdir(), 'estado-personales-' + Date.now() + '.json');
-// Cerebro Sonnet (01/10/2026): apagado, para no heredar `sombra` del .env real.
-process.env.CEREBRO_MODO = 'apagado';
+// Sin bot de siempre (poda de iPhone): contesta un Sonnet de mentira (test/sonnet-fijo.js).
+process.env.CEREBRO_MODO = 'todos';
+process.env.ANTHROPIC_API_KEY = 'clave-de-mentira';
+process.env.CEREBRO_SOMBRA_PERSONA_HASTA = '';
+// La franja de los recordatorios abierta todo el día (el del escalado, abajo).
+process.env.RECORDATORIO_HORA = '0';
+process.env.SEGUIMIENTO_HORA_HASTA = '24';
+process.env.GRUPO_AVISOS_JID = '';
 process.env.APRENDIZAJE_PATH = path.join(os.tmpdir(), 'apr-personales-' + Date.now() + '.jsonl');
 
-const sheets = require('../src/sheets');
-sheets.usarFixture(require('./fixture-planilla'));
 
 const config = require('../src/config');
 const evolution = require('../src/evolution');
 const gemini = require('../src/gemini');
-const resumen = require('../src/resumen');
 
 globalThis.fetch = () => {
   throw new Error('salió a la red durante la prueba');
 };
 
 // Contadores: si el chat se ignora de verdad, ninguno se mueve.
-let llamadasAGemini = 0;
 let pedidosDeAudio = 0;
-const local = require('../src/extractor-local');
-gemini.entender = async (h, m) => {
-  llamadasAGemini++;
-  return local.entender(m);
-};
 gemini.transcribir = async () => 'hola como va todo, te llamo despues';
 evolution.base64DeMedia = async () => {
   pedidosDeAudio++;
@@ -78,6 +76,7 @@ evolution.avisarGrupo = async (t) => {
 };
 evolution.estadoInstancia = async () => ({ state: 'open' });
 
+const sonnetFijo = require('./sonnet-fijo').instalar();
 const bot = require('../src/index');
 const state = require('../src/state');
 const aprendizaje = require('../src/aprendizaje');
@@ -111,7 +110,7 @@ const notaDeVoz = (chatId) => ({
 function limpiar() {
   aClientes.length = 0;
   alGrupo.length = 0;
-  llamadasAGemini = 0;
+  sonnetFijo.llamadas.length = 0;
   pedidosDeAudio = 0;
 }
 
@@ -167,7 +166,7 @@ async function conLista(lista, fn) {
   await check('no se le contesta y no se escala', async () => {
     await conLista(['5492995550001'], async () => {
       limpiar();
-      await bot.procesar(escrito(PERSONAL, 'hola tenes el iphone 13?'));
+      await bot.procesar(escrito(PERSONAL, 'hola tienen laja?'));
       await dormir(200);
       assert.strictEqual(aClientes.length, 0, 'le contestó a un contacto personal');
       assert.strictEqual(alGrupo.length, 0, 'escaló por un contacto personal');
@@ -182,12 +181,12 @@ async function conLista(lista, fn) {
     });
   });
 
-  await check('no se llama a Gemini', async () => {
+  await check('no se le pregunta a Sonnet', async () => {
     await conLista(['5492995550001'], async () => {
       limpiar();
-      await bot.procesar(escrito(PERSONAL, 'tenes el 14 pro? tengo 500.000'));
+      await bot.procesar(escrito(PERSONAL, 'tienen piedra bola? tengo 500.000'));
       await dormir(200);
-      assert.strictEqual(llamadasAGemini, 0, 'gastó una llamada a Gemini');
+      assert.strictEqual(sonnetFijo.llamadas.length, 0, 'gastó una llamada a Sonnet');
     });
   });
 
@@ -210,21 +209,27 @@ async function conLista(lista, fn) {
     });
   });
 
-  await check('no aparece en el resumen aunque ya estuviera en estado.json', async () => {
-    // Se simula un chat personal guardado ANTES de cargar la lista negra.
+  await check('no le suena el recordatorio del escalado aunque ya estuviera en estado.json', async () => {
+    // Se simula un chat personal guardado y escalado ANTES de cargar la lista negra (el resumen de la
+    // mañana, que era el otro lugar donde salía, quedó en _heredado-iphone/ con la poda).
     const viejo = '5492995550777@s.whatsapp.net';
+    const hace = Date.now() - 60 * 60 * 1000;
     state.actualizar(viejo, {
       nombre: 'Tia',
-      modelo: 'iPhone 13',
-      historial: [{ quien: 'cliente', texto: 'hola', ts: Date.now() }],
+      escalado: true,
+      escaladoEn: hace,
+      escaladoCalla: true,
+      escaladoMotivo: 'algo',
+      historial: [{ quien: 'cliente', texto: 'hola', ts: hace + 1000 }],
     });
-    const sinLista = resumen.armar(state.todos(), 3).join('\n');
-    assert.ok(/5550777|Tia/.test(sinLista), 'el caso no prueba nada: no salía ni antes');
-
+    limpiar();
+    await bot.revisarEscalados();
+    assert.ok(alGrupo.some((t) => /5550777/.test(t)), 'el caso no prueba nada: no sonaba ni antes');
+    state.actualizar(viejo, { escaladoRecordado: null });
     await conLista(['5492995550777'], async () => {
-      const conLaLista = resumen.armar(state.todos(), 3).join('\n');
-      assert.ok(!/5550777/.test(conLaLista), 'el contacto personal sigue saliendo en el resumen');
-      assert.ok(!/Tia/.test(conLaLista), 'el contacto personal sigue saliendo en el resumen');
+      limpiar();
+      await bot.revisarEscalados();
+      assert.ok(!alGrupo.some((t) => /5550777|Tia/.test(t)), 'el contacto personal sigue sonando en el recordatorio');
     });
   });
 
@@ -233,10 +238,10 @@ async function conLista(lista, fn) {
   await check('un cliente normal recibe respuesta', async () => {
     await conLista(['5492995550001'], async () => {
       limpiar();
-      await bot.procesar(escrito(CLIENTE, 'hola tenes el iphone 13?'));
+      await bot.procesar(escrito(CLIENTE, 'hola tienen laja?'));
       await dormir(250);
       assert.ok(aClientes.length > 0, 'dejó de contestarle a un cliente que no está en la lista');
-      assert.ok(llamadasAGemini > 0, 'no analizó el mensaje de un cliente');
+      assert.ok(sonnetFijo.llamadas.length > 0, 'no le preguntó a Sonnet por un cliente');
       assert.ok(state.todos()[CLIENTE], 'no guardó el chat de un cliente');
     });
   });

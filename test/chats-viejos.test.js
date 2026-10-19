@@ -52,12 +52,11 @@ process.env.EVOLUTION_APIKEY = 'clave-de-prueba';
 process.env.GRUPO_AVISOS_JID = '120363000000000000@g.us';
 process.env.ESTADO_PATH = path.join(CARPETA, 'estado.json');
 // Cerebro Sonnet (01/10/2026): apagado, para no heredar `sombra` del .env real.
-process.env.CEREBRO_MODO = 'apagado';
+process.env.CEREBRO_MODO = 'todos';
+process.env.ANTHROPIC_API_KEY = 'clave-de-mentira';
+process.env.CEREBRO_SOMBRA_PERSONA_HASTA = '';
 process.env.APRENDIZAJE_PATH = path.join(CARPETA, 'aprendizaje.jsonl');
 
-const sheets = require('../src/sheets');
-sheets.usarFixture(require('./fixture-planilla'));
-sheets.registrarLead = async () => {};
 
 const config = require('../src/config');
 const evolution = require('../src/evolution');
@@ -115,6 +114,8 @@ evolution.buscarMensajes = async (q) => {
   };
 };
 
+// Sin bot de siempre (poda de iPhone): contesta un Sonnet de mentira (test/sonnet-fijo.js).
+const sonnetFijo = require('./sonnet-fijo').instalar();
 const bot = require('../src/index');
 const state = require('../src/state');
 const chatsViejos = require('../src/chats-viejos');
