@@ -3,7 +3,7 @@
  * Registro de aprendizaje.
  *
  * Qué escribió el cliente, qué habría contestado el bot y qué contestó una persona
- * de la cuenta (Tomi o Fran). Es la materia prima para mejorar el bot: muestra
+ * de la cuenta. Es la materia prima para mejorar el bot: muestra
  * exactamente dónde la persona dice algo distinto.
  *
  * Desde el bloque 6 de la auditoría (hallazgo B1, decisiones de Tomás del 22/09/2026)
@@ -211,8 +211,8 @@ function humano(chatId, { id, texto }, { tandaEnCurso = false } = {}) {
  * Evento `silencio` (bloque Ninjo 2, revisión de Ninjo del 05/10/2026, punto 3.1): una tanda, o una
  * línea del cliente, que se quedó sin respuesta. Para contestar "¿por qué no le contestó a X?" sin leer
  * la consola. `motivo`: 'persona', 'pausado', 'escalado', 'repetido', 'escalo', 'sin-texto', 'corte',
- * 'fuera-de-prueba', 'escucha', 'borrador', 'sin-numero', 'sin-venta', 'sonnet-no-pudo', 'apagada' (Chiara
- * apagada desde el panel) o 'error' (los anota index.js, cada uno en su camino; ver CLAUDE.md). `lineas`: los ids de las líneas del cliente ([]
+ * 'fuera-de-prueba', 'escucha', 'borrador', 'sin-numero', 'sin-venta', 'sonnet-no-pudo', 'apagada' (el bot
+ * apagado con #apagar) o 'error' (los anota index.js, cada uno en su camino; ver CLAUDE.md). `lineas`: los ids de las líneas del cliente ([]
  * si no hay). `extra`: lo que suma cada camino (`tanda`, `origen`, `formato`, `detalle`, `sinMandar`).
  * `formato` y no `tipo`: `tipo` es el del evento.
  */

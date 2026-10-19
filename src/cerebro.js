@@ -242,7 +242,7 @@ const MONTO = /(\$\s*)?(\d[\d.,]*\d|\d)(\s*(?:mil|k|lucas)\b)?/gi;
 /**
  * ¿El número de `m` (un match de MONTO en `t`) es el de una dirección? Después de "calle", "av",
  * "avenida", "ruta", "km", "pasaje", "diagonal", "bv"/"boulevard" o "esquina", o de un nombre propio
- * (una palabra con mayúscula que no arranca la frase: "Belgrano 3090", "Santa Fe al 1200"). "Sale 15000"
+ * (una palabra con mayúscula que no arranca la frase: "San Martín 3090", "Santa Fe al 1200"). "Sale 15000"
  * al principio de la frase no es una dirección.
  */
 const CALLE_Y_NOMBRE = /\b(?:calle|av|avda|avenida|ruta|km|pasaje|psje|diagonal|diag|bv|boulevard|esquina)\.?(?:\s+[\p{L}.]+){0,3}(?:\s+al)?\s*(?:n[°º]?\s*)?$/iu;
@@ -256,7 +256,7 @@ function esDireccion(t, m) {
 /**
  * Los montos de un texto, en pesos: con $, con 4 cifras o más, o en "mil". "254.000", "254000",
  * "254 mil", "$254 mil", "254k" y "$254.000,00" son todos 254000. "128gb", "100%", "2 bolsas" no son
- * montos, y tampoco un año suelto ("salió en 2024") ni la altura de una dirección ("Belgrano 3090").
+ * montos, y tampoco un año suelto ("salió en 2024") ni la altura de una dirección ("San Martín 3090").
  */
 function montosEn(texto) {
   const t = String(texto || '');

@@ -47,7 +47,7 @@ if (!lineas.length) {
     process.exit(1);
   }
   console.log('\nTodavia no hay nada registrado.');
-  console.log(C.gris('Se va llenando solo: cada vez que Tomi o Fran contestan en un chat,'));
+  console.log(C.gris('Se va llenando solo: cada vez que una persona de la cuenta contesta en un chat,'));
   console.log(C.gris('se guarda que pregunto el cliente, que habria dicho el bot y que dijo la persona.\n'));
   process.exit(0);
 }

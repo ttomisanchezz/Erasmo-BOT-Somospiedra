@@ -45,7 +45,6 @@ process.env.SEGUIMIENTO_HORA_HASTA = '24';
 process.env.RECORDATORIO_HORA = '0';
 process.env.RESUMEN_ACTIVO = 'false';
 process.env.GUARDIAN_ACTIVO = 'false';
-process.env.TECHSUR_ACTIVO = 'false';
 process.env.AUDIO_ACTIVO = 'false';
 process.env.WEBHOOK_SECRETO = '';
 process.env.HOST = '';
@@ -125,7 +124,7 @@ const sombraPersona = require('../src/sombra-persona');
 
 const escrito = (chatId, t) => ({ key: { remoteJid: chatId, fromMe: false, id: 'T' + Math.random() }, pushName: 'Lucia', message: { conversation: t } });
 /** Un mensaje escrito desde la cuenta del negocio en el chat del cliente: una persona. */
-const mio = (chatId, t) => ({ key: { remoteJid: chatId, fromMe: true, id: 'H' + Math.random() }, pushName: 'Tomi', message: { conversation: t } });
+const mio = (chatId, t) => ({ key: { remoteJid: chatId, fromMe: true, id: 'H' + Math.random() }, pushName: 'Persona', message: { conversation: t } });
 function eventos() {
   try {
     return fs.readFileSync(process.env.APRENDIZAJE_PATH, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l));

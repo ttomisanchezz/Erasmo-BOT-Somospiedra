@@ -103,7 +103,7 @@ const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
 const leer = (f) => fs.readFileSync(f, 'utf8');
 const mtime = (f) => fs.statSync(f).mtimeMs;
 const ESTADO_VALIDO = {
-  '5490000000002@s.whatsapp.net': { nombre: 'Bruno', modelo: 'iPhone 13', entrega: 400000, historial: [] },
+  '5490000000002@s.whatsapp.net': { nombre: 'Bruno', modelo: 'laja', entrega: 400000, historial: [] },
   'bot:interno': { esquema: 3 },
 };
 
@@ -135,7 +135,7 @@ const CARGAR_Y_SALIR_SOLO = `const s = require(${JSON.stringify(STATE_JS)}); s.t
       return original(a, b);
     };
     try {
-      state.actualizar('5490000000003@s.whatsapp.net', { modelo: 'iPhone 14' });
+      state.actualizar('5490000000003@s.whatsapp.net', { modelo: 'piedra bola' });
       state.guardarAhora();
     } finally {
       fs.renameSync = original;
@@ -146,7 +146,7 @@ const CARGAR_Y_SALIR_SOLO = `const s = require(${JSON.stringify(STATE_JS)}); s.t
     );
     assert.ok(!fs.existsSync(state.ARCHIVO + '.tmp'), 'quedó estado.json.tmp suelto');
     const datos = JSON.parse(leer(state.ARCHIVO));
-    assert.strictEqual(datos['5490000000003@s.whatsapp.net'].modelo, 'iPhone 14');
+    assert.strictEqual(datos['5490000000003@s.whatsapp.net'].modelo, 'piedra bola');
   });
 
   await check('rename con EPERM dos veces: reintenta y termina escribiendo', async () => {
@@ -473,8 +473,8 @@ const CARGAR_Y_SALIR_SOLO = `const s = require(${JSON.stringify(STATE_JS)}); s.t
     const archivo = path.join(DIR, 'respaldos', 'estado.json');
     const dirCopias = path.join(path.dirname(archivo), 'backups', 'estado');
     const GUARDAR_DOS = `const s = require(${JSON.stringify(STATE_JS)});
-      s.actualizar('5490000000021@s.whatsapp.net', { modelo: 'iPhone 13' }); s.guardarAhora();
-      s.actualizar('5490000000022@s.whatsapp.net', { modelo: 'iPhone 15' }); s.guardarAhora();
+      s.actualizar('5490000000021@s.whatsapp.net', { modelo: 'laja' }); s.guardarAhora();
+      s.actualizar('5490000000022@s.whatsapp.net', { modelo: 'granza' }); s.guardarAhora();
       process.exit(0);`;
     enOtroProceso(GUARDAR_DOS, archivo);
     let copias = fs.readdirSync(dirCopias);
@@ -487,7 +487,7 @@ const CARGAR_Y_SALIR_SOLO = `const s = require(${JSON.stringify(STATE_JS)}); s.t
       fs.writeFileSync(path.join(dirCopias, `estado-2026-08-${String(h).padStart(2, '0')}T05.json`), '{}');
     }
     const GUARDAR_UNO = `const s = require(${JSON.stringify(STATE_JS)});
-      s.actualizar('5490000000023@s.whatsapp.net', { modelo: 'iPhone 14' }); s.guardarAhora();
+      s.actualizar('5490000000023@s.whatsapp.net', { modelo: 'piedra bola' }); s.guardarAhora();
       console.error('ULTIMO=' + s.ultimoRespaldo() + ' TOPE=' + s.HORAS_DE_RESPALDO); process.exit(0);`;
     const corrida = spawnSync(process.execPath, ['-e', 'console.log = () => {}; ' + GUARDAR_UNO], {
       cwd: __dirname,

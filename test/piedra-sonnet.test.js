@@ -141,9 +141,9 @@ const nuevo = () => `54900000${String(++n).padStart(5, '0')}`;
 
   await check('un año suelto o una dirección no son montos', async () => {
     const num = nuevo();
-    sonnet.guion(sonnet.responde(['estamos desde 2019', 'el local queda en Belgrano 3090']));
+    sonnet.guion(sonnet.responde(['estamos desde 2019', 'el local queda en San Martín 3090']));
     await bot.procesar(mensaje(num, 'donde estan?'));
-    assert.deepStrictEqual(aClientes.map((m) => m.texto), ['estamos desde 2019', 'el local queda en Belgrano 3090']);
+    assert.deepStrictEqual(aClientes.map((m) => m.texto), ['estamos desde 2019', 'el local queda en San Martín 3090']);
   });
 
   await check('un monto frenado y corregido sin monto: sale lo corregido', async () => {

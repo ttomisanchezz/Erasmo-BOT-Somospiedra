@@ -3,8 +3,8 @@
  * Las promesas que el bot nunca hace, por la FORMA de la frase.
  *
  *   - A nombre de otra persona ("ahora te responde fran", "dejame verlo con fran", "te va a llamar
- *     tomi"): si nadie escribe, el cliente se queda esperando un mensaje que no llega. No alcanza
- *     con una lista de nombres ("fran", "tomi"): mañana entra otro vendedor y la regla no lo ve. Se
+ *     juan"): si nadie escribe, el cliente se queda esperando un mensaje que no llega. No alcanza
+ *     con una lista de nombres ("fran", "juan"): mañana entra otro vendedor y la regla no lo ve. Se
  *     busca un verbo de responder pegado a un nombre y se descartan las palabras comunes que pueden
  *     ocupar ese lugar ("te pasa algo", "te confirma el horario").
  *   - De contacto posterior (Mejora 1, decisión del negocio del 16/09/2026): "te aviso", "te
@@ -46,7 +46,7 @@ const PROMESAS = [
   new RegExp(`\\bque te (?:${RESPONDA})n? ([a-z]+)`, 'g'), //        "dejame que te ayude fran"
   new RegExp(`\\b(?:${CONSULTAR}) con ([a-z]+)`, 'g'), //            "dejame verlo con fran"
   new RegExp(`\\b([a-z]+) te (?:${RESPONDE}|va a|van a)\\b`, 'g'), // "fran te escribe"
-  new RegExp(`\\bte (?:va|van) a (?:${VA_A}) ([a-z]+)`, 'g'), //     "te va a llamar tomi"
+  new RegExp(`\\bte (?:va|van) a (?:${VA_A}) ([a-z]+)`, 'g'), //     "te va a llamar juan"
 ];
 
 /** El pedazo del mensaje que promete una respuesta a nombre de otro, o null. */

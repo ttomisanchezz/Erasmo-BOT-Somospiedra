@@ -211,10 +211,10 @@ async function con(cambios, fn) {
   });
 
   await check('un chat de antes (solo con ultimaPropuestaBot) cuenta como que el bot participó', () => {
-    assert.strictEqual(ventas.botParticipo({ ultimaPropuestaBot: 'Sii tenemos iPhone 13' }), true);
+    assert.strictEqual(ventas.botParticipo({ ultimaPropuestaBot: 'Sii tenemos laja' }), true);
     assert.strictEqual(ventas.botParticipo({ ultimaPropuestaBot: '' }), false);
     assert.strictEqual(ventas.botParticipo({}), false);
-    assert.strictEqual(ventas.botLeMando({ ultimaPropuestaBot: 'Sii tenemos iPhone 13' }), false);
+    assert.strictEqual(ventas.botLeMando({ ultimaPropuestaBot: 'Sii tenemos laja' }), false);
   });
 
   console.log('\nPropuso o le mandó\n');

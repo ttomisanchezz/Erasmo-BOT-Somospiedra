@@ -625,9 +625,9 @@ function pedirSalud() {
     assert.strictEqual(evolution.leLlegaAlCliente(jid(VIEJO)), false);
     assert.strictEqual(evolution.esDestinoDePrueba(jid(NUEVO)), true);
     assert.strictEqual(evolution.esDestinoDePrueba(jid(TESTER)), true);
-    await bot.procesar(escrito(VIEJO, 'hola tenes el iphone 13?'));
-    await bot.procesar(escrito(NUEVO, 'hola tenes el iphone 13?'));
-    await bot.procesar(escrito(TESTER, 'hola tenes el iphone 13?'));
+    await bot.procesar(escrito(VIEJO, 'hola tienen laja?'));
+    await bot.procesar(escrito(NUEVO, 'hola tienen laja?'));
+    await bot.procesar(escrito(TESTER, 'hola tienen laja?'));
     await dormir(300);
     assert.ok(!leLlego(VIEJO), 'le escribió a un chat viejo');
     assert.ok(leLlego(NUEVO), 'no le contestó a un chat nuevo');
@@ -650,7 +650,7 @@ function pedirSalud() {
     limpiar();
     escribirLista({ viejos: [VIEJO], alDia: ALDIA });
     await arrancar(ESCUCHA);
-    await bot.procesar(escrito(OTRO_NUEVO, 'hola tenes el iphone 13?'));
+    await bot.procesar(escrito(OTRO_NUEVO, 'hola tienen laja?'));
     await dormir(300);
     assert.ok(leLlego(OTRO_NUEVO), 'no le contestó a un chat que empezó con el bot mirando');
     assert.ok(!archivo().viejos[OTRO_NUEVO], 'lo puso en la lista');
@@ -665,7 +665,7 @@ function pedirSalud() {
     await arrancar(ESCUCHA);
     const antes = Date.parse(archivo().alDia);
     await dormir(20);
-    await bot.procesar(escrito('5490000000031', 'hola tenes el iphone 13?'));
+    await bot.procesar(escrito('5490000000031', 'hola tienen laja?'));
     await dormir(300);
     const enviados = idEnvio;
     const d = archivo();
@@ -699,7 +699,7 @@ function pedirSalud() {
     await arrancar(ESCUCHA, { reintentoMs: 40, tickMs: 15 });
     assert.strictEqual(evolution.esDestinoDePrueba(jid(NUEVO)), false, 'sin ponerse al día, un chat nuevo tiene que ir en borrador');
     assert.strictEqual(evolution.esDestinoDePrueba(jid(TESTER)), true, 'el tester siempre recibe');
-    await bot.procesar(escrito(NUEVO, 'hola tenes el iphone 13?'));
+    await bot.procesar(escrito(NUEVO, 'hola tienen laja?'));
     await dormir(250);
     assert.ok(!leLlego(NUEVO), 'le escribió en vivo sin estar al día');
     assert.ok(evo.pedidos.length >= 3, `no reintentó (${evo.pedidos.length} pedidos)`);
@@ -767,8 +767,8 @@ function pedirSalud() {
     evo.demora = 250;
     const puesta = arrancar(ESCUCHA);
     await Promise.all([
-      bot.procesar(escrito('5490000000040', 'hola tenes el iphone 13?')),
-      bot.procesar(escrito(VIEJO, 'hola tenes el iphone 13?')),
+      bot.procesar(escrito('5490000000040', 'hola tienen laja?')),
+      bot.procesar(escrito(VIEJO, 'hola tienen laja?')),
     ]);
     await puesta;
     await dormir(300);
@@ -782,7 +782,7 @@ function pedirSalud() {
     escribirLista({ viejos: [VIEJO], alDia: ALDIA });
     evo.demora = 600;
     const puesta = arrancar(ESCUCHA, { esperaMaxMs: 50 });
-    await bot.procesar(escrito('5490000000041', 'hola tenes el iphone 13?'));
+    await bot.procesar(escrito('5490000000041', 'hola tienen laja?'));
     await dormir(200);
     assert.ok(!leLlego('5490000000041'), 'le escribió en vivo sin estar al día');
     await puesta;
@@ -807,7 +807,7 @@ function pedirSalud() {
       assert.strictEqual(alGrupo.length, 0, 'avisó al grupo con SOLO_CHATS_NUEVOS apagado');
       assert.ok(evo.pedidos.length >= 2, 'no reintentó');
       assert.ok(lineas.some((l) => /CHATS VIEJOS: no pude ponerme al día/.test(l)), 'no lo dejó en el log:\n' + lineas.join('\n'));
-      await bot.procesar(escrito(VIEJO, 'hola tenes el iphone 13?'));
+      await bot.procesar(escrito(VIEJO, 'hola tienen laja?'));
       await dormir(300);
       assert.ok(leLlego(VIEJO), 'dejó de contestarle a un chat viejo con SOLO_CHATS_NUEVOS apagado');
       evo.falla = null;
@@ -923,8 +923,8 @@ function pedirSalud() {
     const nuevo = '5490000000050';
     assert.strictEqual(evolution.esDestinoDePrueba(jid(nuevo)), false, 'un chat nuevo tiene que ir en borrador durante el corte');
     assert.strictEqual(evolution.esDestinoDePrueba(jid(TESTER)), true, 'el tester siempre recibe');
-    await bot.procesar(escrito(nuevo, 'hola tenes el iphone 13?'));
-    await alTester('hola tenes el iphone 13?');
+    await bot.procesar(escrito(nuevo, 'hola tienen laja?'));
+    await alTester('hola tienen laja?');
     await dormir(300);
     assert.ok(!leLlego(nuevo), 'le escribió en vivo a un chat nuevo durante el corte');
     assert.ok(leLlego(TESTER), 'no le contestó al tester durante el corte');
@@ -982,7 +982,7 @@ function pedirSalud() {
     const ultimoOpen = Date.now() - 20 * MIN;
     await cortarInstancia(ultimoOpen);
     chatsViejos.envioConfirmado('EV-DURANTE-EL-CORTE');
-    await alTester('hola, tenes el iphone 13?');
+    await alTester('hola, tienen laja?');
     await dormir(300);
     assert.ok(leLlego(TESTER), 'el caso no prueba nada: el tester no recibió');
     const d = archivo();
@@ -1125,7 +1125,7 @@ function pedirSalud() {
       const nuevo = '5490000000055';
       assert.strictEqual(evolution.esDestinoDePrueba(jid(VIEJO)), true);
       assert.strictEqual(evolution.esDestinoDePrueba(jid(nuevo)), true);
-      await bot.procesar(escrito(nuevo, 'hola tenes el iphone 13?'));
+      await bot.procesar(escrito(nuevo, 'hola tienen laja?'));
       await dormir(300);
       assert.ok(leLlego(nuevo), 'dejó de contestarle a un chat nuevo con SOLO_CHATS_NUEVOS apagado');
       assert.strictEqual(archivo().alDia, iso(ultimoOpen), 'apagado, alDia también se frena: la lista tiene que estar completa cuando se prenda');

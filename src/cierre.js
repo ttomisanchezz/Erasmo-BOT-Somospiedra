@@ -1,8 +1,7 @@
 'use strict';
 /**
- * Si una línea del cliente es solo un acuse o un agradecimiento. Hasta el panel Chiara (06/10/2026) vivía
- * en index.js (bloque Ninjo 1b, el barrido del silencio); se movió tal cual para que lo use también
- * src/panel-chiara.js (un "gracias" que no pide respuesta no deja al cliente esperando).
+ * Si una línea del cliente es solo un acuse o un agradecimiento. Lo usan el barrido del silencio y #sigue
+ * (index.js): un "gracias" que no pide respuesta no deja al cliente esperando.
  */
 const promesas = require('./promesas');
 

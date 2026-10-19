@@ -232,7 +232,7 @@ const poner = (chatId, extra) => state.guardarRecordatorio(chatId, activo(extra)
 
   await check('#recordar en el chat: anota, confirma al grupo con el link y al cliente no le llega nada', async () => {
     const chat = nuevoChat();
-    await bot.procesar(mensaje(chat, 'hola tenes el iphone 13?'));
+    await bot.procesar(mensaje(chat, 'hola tienen laja?'));
     await dormir(200);
     limpiar();
     await bot.procesar(mio(chat, '#recordar mandarle la foto del azul'));

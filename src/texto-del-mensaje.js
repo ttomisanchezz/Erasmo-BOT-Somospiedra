@@ -48,7 +48,7 @@ const esFotoDelCliente = (l) => Boolean(l) && l.quien === 'cliente' && String(l.
 
 /**
  * Lo que cita el cliente (decisión de Tomás del 08/10/2026, chat …3557: respondió a un producto del catálogo de
- * WhatsApp, "iPhone 13 100%", con "Hola a qe precio están", Sonnet no vio la cita y mandó la lista entera). Cuando
+ * WhatsApp, un producto, con "Hola a qe precio están", Sonnet no vio la cita y mandó la lista entera). Cuando
  * un mensaje responde a otro (un producto del catálogo, un estado, un mensaje nuestro o suyo), WhatsApp trae el
  * citado en `contextInfo.quotedMessage`: en el `contextInfo` del tipo de mensaje (extendedTextMessage,
  * imageMessage, audioMessage…; la forma de Baileys) o arriba, en `data.contextInfo` (Evolution v2 lo copia ahí; son
@@ -137,7 +137,7 @@ function loCitado(m) {
 }
 
 /**
- * La línea del cliente con lo que citó adelante: "[responde a: iPhone 13 100%] Hola a qe precio están". Sin cita, el
+ * La línea del cliente con lo que citó adelante: "[responde a: Laja patagónica] Hola a qe precio están". Sin cita, el
  * texto tal cual. Es lo que va al historial (y de ahí a Sonnet): index.js con lo que llega por el webhook (un texto,
  * un epígrafe o la transcripción de un audio) y contexto.js con las líneas del cliente que trae de Evolution.
  */
