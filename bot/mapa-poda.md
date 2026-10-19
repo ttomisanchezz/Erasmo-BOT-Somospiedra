@@ -80,8 +80,8 @@ nuevos de Piedra (Sonnet de mentira contestando `responder`/`escalar`, Evolution
 | `gemini.test.js` | ADAPTAR | Queda la parte de datos personales; la de `entender` se va. |
 | `guardian.test.js` | ADAPTAR | Carga index + planilla de prueba solo de fondo: se saca la planilla. |
 | `chats-viejos.test.js` | ADAPTAR | Igual: la planilla es de fondo. |
-| `dedupe.test.js`, `persistencia.test.js`, `lid.test.js`, `personales.test.js`, `recordatorios.test.js`, `ventas.test.js`, `sombra-persona.test.js` | ADAPTAR si alcanza con sacar la planilla y el bot de siempre; si no, MOVER y cubrir con tests nuevos | Se decide corriéndolos después de adaptar index.js (resultado al final de este mapa). |
-| `webhook.test.js`, `tandas.test.js`, `silencio.test.js`, `reset.test.js`, `seguridad.test.js`, `lista-blanca.test.js`, `control.test.js`, `cerebro-vivo.test.js`, `silencios-y-salud.test.js`, `responde-a.test.js`, `audio.test.js`, `aprendizaje.test.js`, `fotos-sonnet.test.js`, `foto-historial-sigue.test.js` | MOVER (salvo que pasen con cambios mínimos) | Esperan textos/cotizaciones del bot de siempre o de Sonnet con herramientas de iPhone. Cubiertos por los tests nuevos de Piedra. |
+| `dedupe.test.js`, `persistencia.test.js`, `lid.test.js`, `personales.test.js`, `recordatorios.test.js`, `ventas.test.js`, `sombra-persona.test.js` | ADAPTAR (hecho) | Sin la planilla; donde esperaban "que el bot conteste", un Sonnet de mentira (`test/sonnet-fijo.js`). persistencia: marcas genéricas en vez de las de iPhone. personales: el chequeo del resumen pasó al recordatorio del escalado. ventas: sin las partes del resumen y del seguimiento. |
+| `webhook.test.js`, `tandas.test.js`, `silencio.test.js`, `reset.test.js`, `seguridad.test.js`, `lista-blanca.test.js`, `control.test.js`, `cerebro-vivo.test.js`, `silencios-y-salud.test.js`, `responde-a.test.js`, `audio.test.js`, `aprendizaje.test.js`, `fotos-sonnet.test.js`, `foto-historial-sigue.test.js` | MOVER (hecho) | Esperan textos/cotizaciones del bot de siempre, el seguimiento, el resumen o Sonnet con herramientas de iPhone. Cubiertos por los tests nuevos de Piedra (abajo). |
 | `cotizador.test.js`, `financiacion.test.js`, `precio.test.js`, `entrega.test.js`, `validacion-comercial.test.js`, `bateria-cerebro.test.js`, `techsur.test.js`, `stock-app.test.js`, `fotos-equipos.test.js`, `promo-madre.test.js`, `panel-chiara.test.js`, `espejo-cotizador.test.js`, `timeout-supabase.test.js`, `temas.test.js`, `saludo.test.js`, `seguimiento.test.js`, `sin-venta.test.js`, `no-entiende.test.js`, `notas.test.js`, `redactar.test.js`, `marcas.test.js`, `desde-cero.test.js`, `pdf-fallido.test.js`, `fotos-pedido.test.js`, `turnos.test.js`, `resumen.test.js`, `cerebro.test.js`, `aprobar.test.js` | MOVER | Prueban módulos que se mueven o reglas de venta de iPhone. |
 | `evaluar.js` | ADAPTAR (reescrito) | Corría el banco de casos de iPhone (casos.js + correr-caso.js + responder). Queda un set mínimo de Piedra con respuestas de Sonnet enlatadas. |
 | `casos.js`, `correr-caso.js`, `aprobados.js`, `aprobar.js`, `ejemplos-aprobados.json`, `fixture-planilla.js`, `leer-planilla.js`, `bateria-cerebro.js`, `bateria-cerebro-casos.js`, `chatear.js`, `guion.js`, `reproducir.js`, `sombra.js`, `margenes.js`, `techsur.js`, `anuncios.js`, `resumen.js`, `fixtures/` | MOVER | Scripts de iPhone (banco de casos, planilla, TechSur, simulador). |
@@ -97,3 +97,22 @@ nuevos de Piedra (Sonnet de mentira contestando `responder`/`escalar`, Evolution
 | `README.md` | MOVER a `_heredado-iphone/README-iphone.md` | Manual de instalación del bot de iPhone. |
 | `.env.example` | ADAPTAR | Tenía `EVOLUTION_INSTANCE=somosiphone`, un `SHEET_ID` real y variables de Supabase/TechSur/panel. Queda con valores vacíos. |
 | `package.json` | ADAPTAR | Nombre/descr. de Piedra, puerto, scripts de iPhone fuera, `test` con la lista real, sin `googleapis`. |
+
+## Resultado (19/10/2026)
+
+**Tests nuevos de Piedra** (con `test/piedra-ayuda.js`: entorno fijo, Sonnet y Evolution de mentira):
+`instancia.test.js` (instancia vacía / somosiphone no arranca; puerto 3002), `piedra-sonnet.test.js`
+(CEREBRO_MODO, el pedido, 4×300, cualquier monto frena, promesas, escalar, Sonnet que falla, repetidos),
+`piedra-tandas.test.js` (tandas, corte por mensaje nuevo, techo, cita, audio, lid, personales, catálogo,
+fotos), `piedra-control.test.js` (persona 45 min y barrido, #pausa/#sigue/#reset, escalado y ⏰,
+escucha/borrador/listas, #apagar, /salud), `piedra-webhook.test.js` (secreto, tope, validación, 403,
+dedupe y tanda por HTTP). `evaluar.js`: 8 casos de Piedra, 100%.
+
+**Lo que quedó con palabras de iPhone en src/, test/, package.json y .env.example, y por qué:**
+- `somosiphone` en `src/config.js`, `test/instancia.test.js`, `test/piedra-webhook.test.js`, `.env.example` y
+  `test/exportar-historial.test.js`: es la guarda que impide usar la instancia de iPhone.
+- "iPhone" en comentarios que explican la poda (de dónde salió `salida.js`, `avisos-texto.js`, por qué
+  gemini solo transcribe, etc.) y en los tests que verifican que no queda nada de iPhone en el pedido.
+- `5492994637323` en `test/clasificar-historial.test.js`: archivo que no se toca (es un número de ejemplo
+  del clasificador del historial de Piedra).
+- Ningún ID de planilla, URL de Supabase/Google Sheets, número ni nombre de iPhone en el código vivo.
