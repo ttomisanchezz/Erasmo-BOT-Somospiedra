@@ -2,9 +2,9 @@
 require('dotenv').config();
 
 /**
- * Las claves no son obligatorias para arrancar: sin ellas el bot funciona en
- * modo degradado (extractor local, sin planilla) y se puede probar por consola.
- * Lo que sí falla es intentar mandar un mensaje real sin EVOLUTION_APIKEY.
+ * Las claves no son obligatorias para arrancar: sin ANTHROPIC_API_KEY nadie contesta (Sonnet falla y
+ * se avisa al grupo), sin GEMINI_API_KEY no se transcriben audios. Lo que sí falla es mandar un mensaje
+ * real sin EVOLUTION_APIKEY. La única obligatoria es EVOLUTION_INSTANCE (`problemaDeInstancia`).
  */
 function opt(nombre, porDefecto = '') {
   return process.env[nombre] || porDefecto;
@@ -35,15 +35,24 @@ function modoDelCerebro(valor) {
   return MODOS_DEL_CEREBRO.includes(v) ? v : 'apagado';
 }
 
-/** STOCK_APP_MODO (el stock de la app en la planilla, 08/10/2026). Lo que no es uno de los tres cuenta como apagado. */
-const MODOS_DEL_STOCK = ['apagado', 'sombra', 'vivo'];
-function modoDelStock(valor) {
-  const v = String(valor || '').trim().toLowerCase();
-  return MODOS_DEL_STOCK.includes(v) ? v : 'apagado';
+/** La instancia de Somos iPhone: el bot de Piedra nunca la usa. */
+const INSTANCIA_DE_IPHONE = 'somosiphone';
+
+/**
+ * Por qué el bot no puede arrancar con esta instancia de Evolution, o null si está bien: vacía, o la de
+ * Somos iPhone (sin distinguir mayúsculas). Lo mira index.js antes de cargar nada.
+ */
+function problemaDeInstancia(instancia = (process.env.EVOLUTION_INSTANCE || '').trim()) {
+  const v = String(instancia || '').trim();
+  if (!v) return 'EVOLUTION_INSTANCE está vacía (tiene que ser la instancia de Piedra, por ejemplo somospiedra)';
+  if (v.toLowerCase() === INSTANCIA_DE_IPHONE) return `EVOLUTION_INSTANCE es "${v}", la instancia de Somos iPhone`;
+  return null;
 }
 
 module.exports = {
-  puerto: parseInt(process.env.PORT || '3001', 10),
+  problemaDeInstancia,
+  // Piedra escucha en el 3002 (el 3001 es el bot de Somos iPhone, que comparte la PC y Evolution).
+  puerto: parseInt(process.env.PORT || '3002', 10),
   // Vacío (lo normal): escucha en todas las interfaces, como siempre. Con HOST,
   // solo en esa dirección (por ejemplo 127.0.0.1). No está probado que Evolution,
   // desde Docker en Windows, llegue al bot por 127.0.0.1: ver README.
@@ -54,12 +63,12 @@ module.exports = {
   // estado real (`npm run resumen`, `npm run destino`) mientras el bot corre.
   estadoSoloLectura: /^(1|true|si)$/i.test(process.env.ESTADO_SOLO_LECTURA || ''),
   aprendizajePath: process.env.APRENDIZAJE_PATH || '',
-  descartadosPath: process.env.DESCARTADOS_PATH || '',
-  agruparClienteMs: parseInt(process.env.AGRUPAR_CLIENTE_MS || '1200', 10),
 
   evolution: {
     url: process.env.EVOLUTION_URL || 'http://localhost:8080',
-    instancia: process.env.EVOLUTION_INSTANCE || 'somosiphone',
+    // Sin default (poda de iPhone, 19/10/2026): Evolution es compartido con Somos iPhone, una instancia
+    // por negocio. Vacía o `somosiphone`, el bot no arranca (`problemaDeInstancia`, lo mira index.js).
+    instancia: (process.env.EVOLUTION_INSTANCE || '').trim(),
     apikey: opt('EVOLUTION_APIKEY'),
   },
 
@@ -84,20 +93,18 @@ module.exports = {
     // 07/05/2027): es el más barato y tiene su propio cupo. gemini-2.5-flash-lite sale: Google
     // lo limita a quienes ya lo usaban. La próxima vez se cambia en el .env.
     modelo: process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite',
-    // Al que se pasa cuando el principal está saturado, no responde, no existe (404) o se
+    // Gemini se usa SOLO para transcribir audios (poda de iPhone). Al que se pasa cuando el principal está saturado, no responde, no existe (404) o se
     // quedó sin cupo del día (429 por día). Es otro modelo, con su propio cupo.
     modeloRespaldo: process.env.GEMINI_MODEL_RESPALDO || 'gemini-3.1-flash-lite',
   },
 
-  // CEREBRO SONNET (decisión de Tomás del 01/10/2026): Claude Sonnet 5.5 decide qué contestar.
-  // Fase 1, en sombra: piensa con cada tanda real y lo anota (`propuesta-sonnet` en el registro de
-  // aprendizaje), pero no manda nada. Ver src/cerebro.js. Tope de gasto: USD 60 por mes, puesto en
-  // la cuenta de Anthropic.
+  // CEREBRO SONNET: Claude Sonnet 5.5 decide qué contestar. En Piedra no hay "bot de siempre": si
+  // Sonnet no contesta, no contesta nadie (silencio con el cliente y aviso al grupo). Ver src/cerebro.js.
   cerebro: {
     apikey: opt('ANTHROPIC_API_KEY'),
-    // `apagado` (lo normal) no llama nunca a la API. `sombra`: piensa y anota, sin mandar nada.
-    // Fase 2 (02/10/2026): `tester` (Sonnet le contesta de verdad al tester), `nuevos` (al tester y
-    // a los chats nuevos) y `todos` (a todos los que contesta el bot); los demás, en sombra. Ver
+    // `apagado` (lo normal): nadie contesta, el bot solo escucha, guarda y registra; nunca llama a la
+    // API. `sombra`: Sonnet piensa y se anota, sin mandar nada. `tester` (Sonnet le contesta al
+    // tester), `nuevos` (al tester y a los chats nuevos) y `todos`; los demás, en sombra. Ver
     // `cerebro.quienAtiende`. Cualquier otro valor cuenta como apagado.
     modo: modoDelCerebro(process.env.CEREBRO_MODO),
     modelo: process.env.CEREBRO_MODELO || 'claude-sonnet-5-5',
@@ -120,20 +127,13 @@ module.exports = {
     // Ver src/sombra-persona.js.
     sombraPersonaHasta: (process.env.CEREBRO_SOMBRA_PERSONA_HASTA || '').trim(),
     sombraPersonaTopeUsd: parseFloat(process.env.CEREBRO_SOMBRA_PERSONA_TOPE_USD || '1.5') || 1.5,
-    // El tope del mes en USD (bloque Ninjo 2, 06/10/2026), para verlo en /salud (`cerebro.gastoMes`) y
-    // para el aviso al grupo al pasar el 80%. El tope de verdad está puesto en la cuenta de Anthropic:
-    // esto no corta nada. Desde el 08/10/2026 es el único (también el del panel): si no está, vale
-    // CHIARA_TOPE_MES_USD (la del panel, la de antes); si no, 60. Ilegible o en cero, 60.
+    // El tope del mes en USD, para verlo en /salud (`cerebro.gastoMes`) y para el aviso al grupo al
+    // pasar el 80%. El tope de verdad está puesto en la cuenta de Anthropic: esto no corta nada.
+    // Ilegible o en cero, 60.
     topeMesUsd: (() => {
-      const tope = parseFloat(process.env.CEREBRO_TOPE_MES_USD || process.env.CHIARA_TOPE_MES_USD || '60');
+      const tope = parseFloat(process.env.CEREBRO_TOPE_MES_USD || '60');
       return tope > 0 ? tope : 60;
     })(),
-  },
-
-  sheets: {
-    id: opt('SHEET_ID'),
-    credencialesPath: process.env.GOOGLE_CREDENTIALS_PATH || './credenciales.json',
-    cacheSegundos: parseInt(process.env.SHEET_CACHE_SEGUNDOS || '300', 10),
   },
 
   // JID del grupo interno donde llegan los avisos. Formato: 1203...@g.us
@@ -147,27 +147,15 @@ module.exports = {
     maxMensajesPorTanda: parseInt(process.env.MAX_MENSAJES_TANDA || '4', 10),
   },
 
-  // Carpeta con las fotos de los equipos, nombradas por modelo:
-  // 13.jpg, 14-pro.jpg, 15-pro-max.png ... Si no existe, el bot no habla de fotos.
+  // La única carpeta de la que evolution.js acepta mandar una imagen (candado; hoy el bot no manda fotos).
   fotosDir: process.env.FOTOS_DIR || './fotos',
 
-  // Seguimiento: si el cliente no contesta, se le escribe UNA vez.
+  // La franja de horario de SEGUIMIENTO_HORA_DESDE a _HASTA: el guardián mira si llegan mensajes en
+  // ella, y HASTA cierra los recordatorios manuales y el del escalado. El seguimiento automático de
+  // iPhone se fue con la poda (los nombres quedaron para no cambiar el .env).
   seguimiento: {
-    activo: String(process.env.SEGUIMIENTO_ACTIVO || 'true').toLowerCase() === 'true',
-    minutos: parseInt(process.env.SEGUIMIENTO_MINUTOS || '45', 10),
-    maxHoras: parseInt(process.env.SEGUIMIENTO_MAX_HORAS || '24', 10),
-    maxPorBarrido: parseInt(process.env.SEGUIMIENTO_MAX_POR_BARRIDO || '2', 10),
     horaDesde: parseInt(process.env.SEGUIMIENTO_HORA_DESDE || '9', 10),
     horaHasta: parseInt(process.env.SEGUIMIENTO_HORA_HASTA || '22', 10),
-    // Bloque Ninjo 1b (decisión de Tomás del 05/10/2026): el seguimiento sale solo después de una
-    // tanda del bot con montos, hasta 2 veces. El 1º, SEGUIMIENTO_HORAS_1 después (3) y dentro de la
-    // franja (10 a 21, hora de Argentina); el 2º, el día siguiente entre la apertura de la franja y
-    // SEGUIMIENTO_MANANA_HASTA (12). La franja es aparte de SEGUIMIENTO_HORA_DESDE / _HASTA, que
-    // siguen siendo del guardián y los recordatorios. Ver index.js `revisarSeguimientos`.
-    horas1: parseFloat(process.env.SEGUIMIENTO_HORAS_1 || '3') || 3,
-    franjaDesde: parseInt(process.env.SEGUIMIENTO_FRANJA_DESDE || '10', 10),
-    franjaHasta: parseInt(process.env.SEGUIMIENTO_FRANJA_HASTA || '21', 10),
-    mananaHasta: parseInt(process.env.SEGUIMIENTO_MANANA_HASTA || '12', 10),
   },
 
   // Cuando vence el silencio de una persona (bloque Ninjo 1b, decisión de Tomás del 05/10/2026): una
@@ -182,16 +170,6 @@ module.exports = {
   // Mensajes más viejos que esto se descartan sin mirarlos. Es la defensa
   // contra la sincronización de historial que WhatsApp manda al vincular.
   ignorarAnterioresSeg: parseInt(process.env.IGNORAR_ANTERIORES_SEG || '120', 10),
-
-  // Resumen de la mañana al grupo interno: qué hay que contestar hoy.
-  // Sale solo, a la hora fijada. No lee los mensajes del grupo: solo escribe.
-  resumen: {
-    // Arranca APAGADO a propósito: manda un mensaje solo, sin que nadie lo
-    // dispare, y ya se fue una vez al destino equivocado. Se enciende a mano.
-    activo: String(process.env.RESUMEN_ACTIVO || 'false').toLowerCase() === 'true',
-    hora: parseInt(process.env.RESUMEN_HORA || '9', 10),
-    diasFrio: parseInt(process.env.RESUMEN_DIAS_FRIO || '3', 10),
-  },
 
   // Recordatorios manuales al grupo interno: #recordar <texto> y #hecho en el
   // chat del cliente. Suenan a la hora en punto desde `hora` hasta antes de
@@ -228,8 +206,7 @@ module.exports = {
   // hace semanas.
   //
   // 72 horas por defecto: tres días cubren el "lo pienso y te escribo" de una
-  // misma compra (el seguimiento es a los 45 minutos y el resumen enfría a los 3
-  // días), y más que eso ya es otra consulta. Se cambia en el .env.
+  // misma compra, y más que eso ya es otra consulta. Se cambia en el .env.
   datosViejosHoras: parseInt(process.env.DATOS_VIEJOS_HORAS || '72', 10),
 
   // GUARDIÁN DE EVOLUTION (decisión de Tomás del 21/09/2026). Tres cortes en tres
@@ -267,15 +244,8 @@ module.exports = {
   // Modo borrador: no le manda nada al cliente, solo avisa al grupo qué habría respondido.
   modoBorrador: String(process.env.MODO_BORRADOR || 'true').toLowerCase() === 'true',
 
-  // Cuántos mensajes seguidos SIN ninguna señal de venta se le contestan a un
-  // chat antes de dejarlo. Es un crédito, no un filtro: un cliente nuevo que
-  // escribe "hola" todavía no dijo nada de venta y no lo podemos perder.
-  // Cualquier señal (un modelo, un monto) lo devuelve a cero.
-  mensajesSinVenta: parseInt(process.env.MENSAJES_SIN_VENTA || '5', 10),
-
   // NOTAS DE VOZ. Se transcriben con Gemini, pidiéndole el archivo a Evolution.
-  // Se apaga sola con AUDIO_ACTIVO=false, sin tocar el resto del bot. Con
-  // --offline tampoco transcribe, porque ahí Gemini queda en modo solo-local.
+  // Se apaga sola con AUDIO_ACTIVO=false, sin tocar el resto del bot.
   audio: {
     activo: String(process.env.AUDIO_ACTIVO || 'true').toLowerCase() === 'true',
   },
@@ -288,7 +258,7 @@ module.exports = {
   //
   // TESTER: el celular de prueba. Además de recibir los envíos, puede mandar
   // comandos `#` desde su chat (#reset y sus typos reinician; cualquier otro `#` se
-  // descarta), sus leads van a la pestaña LEADS_PRUEBA y no sale en el resumen.
+  // descarta).
   // Formato: coma entre números, se ignora todo lo que no sea dígito.
   //   NUMEROS_TESTER=5491100000000,54 9 11 0000-0001
   // Hasta el 18/09/2026 se llamaba NUMEROS_PRUEBA: si NUMEROS_TESTER está vacía y
@@ -297,12 +267,11 @@ module.exports = {
   numerosPruebaViejo: !numerosTester.length && numerosPruebaViejos.length > 0,
 
   // PILOTO: clientes reales de la prueba. Reciben los envíos como el tester, pero
-  // para todo lo demás son clientes: un "#reset" es un mensaje común, el lead va a
-  // LEADS y aparecen en el resumen.
+  // para todo lo demás son clientes: un "#reset" es un mensaje común.
   //   NUMEROS_PILOTO=5492995550003
   // Con NUMEROS_PILOTO=todos (27/09/2026, decisión de Tomás: el bot atiende a todos
   // los clientes) cualquier chat recibe los envíos; el tester sigue siendo tester
-  // (comandos #, LEADS_PRUEBA, fuera del resumen). `numerosPiloto` queda vacía.
+  // (comandos #). `numerosPiloto` queda vacía.
   numerosPiloto: lista('NUMEROS_PILOTO'),
   pilotoTodos: (process.env.NUMEROS_PILOTO || '').trim().toLowerCase() === 'todos',
   // Solo chats nuevos (28/09/2026; definición del 29/09/2026): el bot solo le escribe a un chat
@@ -317,52 +286,11 @@ module.exports = {
   // que escribe al mismo número que los clientes pero no es una venta.
   //
   // Un chat de esta lista se ignora ENTERO, lo más temprano posible: no se
-  // procesa, no se guarda, no va a Gemini, no se le transcriben los audios, no
-  // sale en el resumen y nunca se le contesta.
+  // procesa, no se guarda, no va a Sonnet, no se le transcriben los audios y
+  // nunca se le contesta.
   //
   // VACÍA (lo normal) no cambia nada. Formato: coma entre números, se ignora
   // todo lo que no sea dígito, con o sin el 9 de celular.
   //   CONTACTOS_PERSONALES=5492995550001,5492995550002
   contactosPersonales: lista('CONTACTOS_PERSONALES'),
-
-  // PRECIOS DE TECHSUR (01/10/2026). El bot lee el grupo Avisos de la comunidad TechSur y guarda
-  // los precios en la app de ventas (panel Cotización). Solo lee: nunca le escribe al grupo.
-  // Ver src/techsur.js.
-  techsur: {
-    activo: (process.env.TECHSUR_ACTIVO || 'true').trim().toLowerCase() !== 'false',
-    // Vacío (lo normal): se busca el grupo por nombre. Con uno o más JID (coma), solo esos.
-    grupoJid: process.env.TECHSUR_GRUPO_JID || '',
-    nombre: process.env.TECHSUR_GRUPO_NOMBRE || 'techsur',
-    // El Supabase de la app de ventas (los mismos valores que su .env.local).
-    supabaseUrl: process.env.SUPABASE_URL || '',
-    supabaseKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-    diasMax: 7,
-    logPath: process.env.TECHSUR_LOG_PATH || '',
-  },
-
-  // PANEL CHIARA (06/10/2026). Cada 1 minuto el bot sube al Supabase de la app de ventas (el mismo de
-  // arriba: SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY) su estado, los leads, los números del día y las
-  // noticias, y lee las órdenes del panel. CHIARA_PANEL_ACTIVO=false lo apaga entero (no cuenta ni sube).
-  // El gasto del mes y su tope son los de cerebro (CEREBRO_TOPE_MES_USD, con CHIARA_TOPE_MES_USD de
-  // respaldo, 08/10/2026). Ver src/panel-chiara.js.
-  panel: {
-    activo: (process.env.CHIARA_PANEL_ACTIVO || 'true').trim().toLowerCase() !== 'false',
-  },
-
-  // EL STOCK DE LA APP EN LA PLANILLA (08/10/2026, decisiones de Tomás; parte 2 del diseño de escritorio).
-  // La planilla del Cotizador es donde vive todo: la app la cambia por medio del bot y Chiara la sigue
-  // leyendo. Cada 1 minuto el bot lee `v_stock_chiara` del Supabase de la app (el mismo de arriba) y escribe
-  // la pestaña USADOS (lo del local); aplica los pedidos `planilla_ordenes` (SÍ/NO en la columna STOCK de
-  // LISTA y LISTA 85-93, lo del depósito) y el espejo copia STOCK a la app. Ver src/stock-app.js.
-  //   apagado (lo normal): nada de esto corre; Chiara contesta como siempre.
-  //   sombra: escribe la pestaña "USADOS APP" (no USADOS) para compararla en el Drive, aplica las órdenes
-  //           y copia STOCK; Chiara contesta como siempre (sin el filtro de STOCK ni la frase del depósito).
-  //   vivo:   escribe USADOS y Chiara usa lo nuevo: local primero, el depósito con STOCK, la frase del
-  //           depósito y el código del equipo al escalar.
-  // Cambiarlo pide reiniciar el bot.
-  stockApp: {
-    modo: modoDelStock(process.env.STOCK_APP_MODO),
-    // La pestaña que se escribe en sombra. Es la única que el bot puede crear.
-    pestanaSombra: 'USADOS APP',
-  },
 };
