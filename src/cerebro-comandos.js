@@ -1,7 +1,7 @@
 'use strict';
 /**
  * Los comandos del cerebro Sonnet en el grupo interno (fase 2, decisiones de Tomás del 02/10/2026).
- * Solo desde la cuenta del negocio, como #sinstock (index.js los mira en el grupo con `fromMe`), y
+ * Solo desde la cuenta del negocio (index.js los mira en el grupo con `fromMe`), y
  * con el número del cliente como #sigue: con o sin 549, o el link wa.me (ventas.js elige el chat).
  *
  *   #sonnet <número>     qué le contestaría Sonnet a ese chat AHORA: lee las últimas 30 líneas y las
@@ -9,9 +9,10 @@
  *                        tocar el estado (salvo el historial, que antes se completa con Evolution
  *                        como en vivo: bloque Ninjo 1b). Con cualquier modo menos `apagado`.
  *   #comparar <número>   las últimas 3 tandas del chat según el registro de aprendizaje: lo que
- *                        escribió el cliente, lo que contestó el bot o una persona, y lo que propuso
+ *                        escribió el cliente, lo que contestó Sonnet o una persona, y lo que propuso
  *                        Sonnet en sombra (`propuesta-sonnet` con el mismo `tanda`).
- *   #bot <número>        ese chat lo atiende el bot de siempre (`atiendeSonnet: false`).
+ *   #bot <número>        ese chat no lo atiende Sonnet: nadie contesta y Sonnet queda en sombra
+ *                        (`atiendeSonnet: false`; en Piedra no hay "bot de siempre").
  *   #sonnet-si <número>  ese chat lo atiende Sonnet (`atiendeSonnet: true`, con la fecha).
  *
  * No escribe en el registro de aprendizaje ni en el estado, salvo #bot y #sonnet-si (la marca).
@@ -28,7 +29,7 @@ const COMO_SE_USA =
   'En el grupo, con el número del cliente (sirve el wa.me):\n' +
   '#sonnet 5492990000000: qué le contestaría Sonnet ahora (no le manda nada)\n' +
   '#comparar 5492990000000: las últimas 3 tandas, con lo que propuso Sonnet\n' +
-  '#bot 5492990000000: lo atiende el bot de siempre\n' +
+  '#bot 5492990000000: no le contesta Sonnet (queda en sombra)\n' +
   '#sonnet-si 5492990000000: lo atiende Sonnet';
 
 /**
@@ -93,9 +94,7 @@ async function queContestaria(chatId) {
     const frenado = r.guardia && r.frenados ? `\nQuería mandar:\n${r.frenados.map((m) => `• ${cerebro.recorte(m, MAX_CITA)}`).join('\n')}` : '';
     return `🧠 Escalaría: ${r.motivo}${frenado}\n${pie}`;
   }
-  const pdf = r.compromisoDePago && !s.compromisoEnviado ? '\n(+ el PDF del compromiso de pago)' : '';
-  const aviso = r.avisoGrupo ? `\n(+ aviso al grupo: ${cerebro.recorte(r.avisoGrupo, 150)})` : '';
-  return `🧠 A ${nombre} le contestaría:\n${r.mensajes.map((m) => `• ${m}`).join('\n')}${pdf}${aviso}\n${pie}`;
+  return `🧠 A ${nombre} le contestaría:\n${r.mensajes.map((m) => `• ${m}`).join('\n')}\n${pie}`;
 }
 
 /** Cómo salió la propuesta del bot, según su modo. */
@@ -127,7 +126,7 @@ function comparar(chatId, eventos = aprendizaje.leerTodo()) {
     out.push('', `${i + 1}) ${cuando(p.ts)}`);
     const delCliente = (p.lineas || []).map((id) => lineas.get(id)).filter(Boolean);
     out.push(`👤 Cliente: ${delCliente.length ? delCliente.map((c) => cita(c.texto)).join(' / ') : '(no está en el registro)'}`);
-    const quienContesto = p.fuente === 'sonnet' ? '🧠 Sonnet, en vivo' : '🤖 El bot';
+    const quienContesto = p.fuente === 'sonnet' ? '🧠 Sonnet, en vivo' : '🤖 Nadie';
     if ((p.mensajes || []).length) out.push(`${quienContesto} (${comoSalio(p)}): ${p.mensajes.map(cita).join(' / ')}${p.escalar ? ` · y escaló: ${p.motivo}` : ''}`);
     else out.push(`${quienContesto}: ${p.escalar ? `escaló sin contestar (${cerebro.recorte(p.motivo, 150)})` : 'no contestó'}`);
     const persona = delChat.filter((e) => e.tipo === 'humano' && e.responde === p.tanda);
@@ -143,13 +142,13 @@ function marcar(chatId, tipo, ahora = Date.now()) {
   const s = state.obtener(chatId);
   const sonnet = tipo === 'sonnet-si';
   if (s.atiendeSonnet === sonnet) {
-    return `${sonnet ? '🧠' : '🤖'} ${quien(chatId, s)} ya lo atendía ${sonnet ? 'Sonnet' : 'el bot de siempre'}, no cambié nada\n${link(chatId)}`;
+    return `${sonnet ? '🧠' : '🤖'} ${quien(chatId, s)} ya ${sonnet ? 'lo atendía Sonnet' : 'estaba sin Sonnet'}, no cambié nada\n${link(chatId)}`;
   }
   state.actualizar(chatId, { atiendeSonnet: sonnet, atiendeSonnetDesde: sonnet ? ahora : null });
   if (!sonnet) {
-    return `🤖 #bot · ${quien(chatId, s)} — lo atiende el bot de siempre${config.cerebro.modo === 'apagado' ? '' : ' (Sonnet sigue en sombra)'}\n${link(chatId)}`;
+    return `🤖 #bot · ${quien(chatId, s)} — Sonnet no le contesta${config.cerebro.modo === 'apagado' ? '' : ' (sigue en sombra)'}\n${link(chatId)}`;
   }
-  const apagado = config.cerebro.modo === 'apagado' ? '\nOjo: con CEREBRO_MODO=apagado igual le contesta el bot de siempre, hasta que lo prendas.' : '';
+  const apagado = config.cerebro.modo === 'apagado' ? '\nOjo: con CEREBRO_MODO=apagado no le contesta nadie, hasta que lo prendas.' : '';
   return `🧠 #sonnet-si · ${quien(chatId, s)} — desde ahora le contesta Sonnet${apagado}\n${link(chatId)}`;
 }
 
@@ -160,7 +159,7 @@ async function desdeGrupo({ tipo, numero }) {
     comando: `#${tipo}`,
     numero,
     nada: 'No hice nada.',
-    verbo: { sonnet: 'leer', comparar: 'comparar', bot: 'pasar al bot', 'sonnet-si': 'pasar a Sonnet' }[tipo],
+    verbo: { sonnet: 'leer', comparar: 'comparar', bot: 'sacarle Sonnet', 'sonnet-si': 'pasar a Sonnet' }[tipo],
     comoSeUsa: COMO_SE_USA,
   });
   if (!elegido.chatId) return elegido.aviso;

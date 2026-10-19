@@ -9,7 +9,7 @@
  * En el chat, mismo patrón que #recordar / #hecho: solo cuenta al principio del
  * mensaje, no entra al historial ni al aprendizaje, no calla al bot, al cliente
  * no le llega nada del bot y se confirma al grupo. En el grupo va con el número
- * del cliente (sirve pegar el wa.me del resumen); sin número contesta cómo se
+ * del cliente (sirve pegar el wa.me de un aviso); sin número contesta cómo se
  * usa y no marca nada a ciegas.
  *
  * Existe para responder lo que el sistema todavía no podía: si el bot ayuda a
@@ -21,7 +21,7 @@
  */
 const state = require('./state');
 const evolution = require('./evolution');
-const { esTelefono } = require('./resumen');
+const { esTelefono } = require('./avisos-texto');
 const { quien } = require('./recordatorios');
 
 const TITULO = { vendido: '💰 Vendido', perdido: '❌ Perdido' };
@@ -31,7 +31,7 @@ const DIGITOS_MINIMOS = 8;
 
 const COMO_SE_USA =
   'En el chat del cliente: #vendido o #perdido\n' +
-  'En el grupo, con su número: #vendido 5492990000000 (sirve pegar el wa.me del resumen)';
+  'En el grupo, con su número: #vendido 5492990000000 (sirve pegar el wa.me de un aviso)';
 
 /**
  * ¿El texto es #vendido o #perdido? Igual que #hecho, solo si el mensaje EMPIEZA

@@ -1,9 +1,8 @@
 'use strict';
 /**
- * Busca la foto de un modelo en la carpeta configurada.
- * Los archivos se nombran por modelo, sin la palabra iPhone:
- *   13.jpg   13-pro.jpg   14 pro max.png   15_pro.jpeg
- * Si no hay carpeta o no hay archivo, devuelve null y el bot no menciona fotos.
+ * Las fotos de la carpeta configurada (FOTOS_DIR), por nombre de archivo. Hoy el bot de Piedra no manda
+ * fotos: queda la carpeta como candado de evolution.js (nunca se manda una imagen de afuera).
+ * Si no hay carpeta o no hay archivo, devuelve null.
  */
 const fs = require('fs');
 const path = require('path');
@@ -16,7 +15,6 @@ function clave(txt) {
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    .replace(/iphone/g, ' ')
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
 }

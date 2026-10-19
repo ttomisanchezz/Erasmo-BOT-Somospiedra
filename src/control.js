@@ -20,22 +20,17 @@
  *    silencio por una persona. Desde el 07/10/2026 (decisión de Tomás) además le
  *    contesta lo que dejó escrito, si corresponde: lo decide index.js (`alSeguir`), y
  *    el aviso de `desdeGrupo` dice si le contesta o por qué no.
- *  - #sinstock <número>, solo desde el grupo (bloque 8): el cliente pidió fotos y no
- *    hay stock para sacarlas; le llega la foto de referencia de cada modelo (index.js).
- *    El chat sigue escalado.
  *
- * Marcas del chat: `escalado`, `escaladoEn`, `escaladoMotivo`, `escaladoRecordado`,
- * `escaladoResuelto` ({ ts, porque }) y `leadRegistrado`: el lead se anota una sola
- * vez por consulta. Sobrevive a la vuelta de un escalado a las 24 h y se limpia con
- * los datos viejos (Pendientes 2): si el contacto vuelve pasadas DATOS_VIEJOS_HORAS
- * y vuelve a escalar, es una fila nueva en LEADS.
+ * Marcas del chat: `escalado`, `escaladoEn`, `escaladoMotivo`, `escaladoRecordado` y
+ * `escaladoResuelto` ({ ts, porque }). En Piedra no hay planilla de leads (poda de
+ * iPhone, 19/10/2026): el lead queda solo en el aviso al grupo.
  */
 const config = require('./config');
 const state = require('./state');
 const evolution = require('./evolution');
 const ventas = require('./ventas');
 const { quien, horario, enHorario } = require('./recordatorios');
-const { esTelefono } = require('./resumen');
+const { esTelefono } = require('./avisos-texto');
 const { esFotoDelCliente } = require('./texto-del-mensaje');
 
 const MIN = 60 * 1000;
@@ -44,9 +39,8 @@ const HORA = 60 * MIN;
 /**
  * Deja el chat escalado desde ahora, con su motivo.
  *
- * `calla: false` son los escalados de "no entendí": avisan al grupo y quedan en el
- * resumen como hasta ahora, pero el bot sigue atendiendo. Los de antes de esta
- * marca callan, como cuando se agregó.
+ * `calla: false` (un audio que no se entendió): avisan al grupo pero el bot sigue
+ * atendiendo lo que el cliente escriba después. Los de antes de esta marca callan.
  */
 function escalar(chatId, motivo, { calla = true, ahora = Date.now() } = {}) {
   state.actualizar(chatId, {
@@ -81,34 +75,12 @@ function callado(s) {
 /**
  * Vuelta 2: pasaron ESCALADO_REANUDAR_HORAS sin que nadie lo tome y el cliente
  * vuelve a escribir. Se atiende como consulta nueva, así que se borran las marcas de
- * "esto ya se dijo" de la charla vieja (decidido con Tomás el 15/09/2026).
- *
- * Se conserva lo que dijo el cliente y lo que ya pasó: nombre, modelo, entrega,
- * modelos pedidos, notas, el historial, `temasExplicados` (la memoria por tema no
- * caduca), `resultado` (#vendido / #perdido), si el bot propuso o mandó algo, y
- * `leadRegistrado`: a las 24 h el lead ya anotado no se anota de nuevo (recién se
- * limpia con los datos viejos, ver `DATOS_QUE_CADUCAN`). `modeloPropuesto` (el
- * modelo que eligió el bot sin que el cliente lo nombrara) sí se limpia: es el
- * respaldo del hilo de la charla vieja (Pendientes 1, Parte A).
+ * "esto ya se dijo" de la charla vieja (decidido con Tomás el 15/09/2026). Se
+ * conserva lo que dijo el cliente, el historial y `resultado` (#vendido / #perdido).
  */
 const RESET_DE_LA_CHARLA = {
-  listaEnviada: false,
-  stockInformadoDe: null,
-  preciosMostradosDe: [],
-  cotizadoDe: null,
-  entregaCotizada: null,
-  cotizadoDeContado: null,
-  preguntamosFormaPago: false,
-  insistenciaEntrega: null,
-  puertaAbiertaDe: null,
-  entregaRepreguntada: false,
-  seguimientoEnviado: false,
-  noEntendido: null,
   acuseContestado: null,
-  sinVenta: 0,
-  calladoPorNoVenta: false,
   ultimoAvisoSilencio: null,
-  modeloPropuesto: null,
 };
 
 function limpiarParaConsultaNueva(chatId) {
@@ -116,61 +88,23 @@ function limpiarParaConsultaNueva(chatId) {
 }
 
 /**
- * Datos viejos por tiempo (Pendientes 1, B3, decisión de Tomás del 18/09/2026).
- *
- * `RESET_DE_LA_CHARLA` corría solo cuando volvía un escalado a las 24 h, y dejaba el
- * modelo, la entrega, la forma de pago, la capacidad, la permuta y el presupuesto:
- * un cliente que nunca escaló y vuelve a la semana arrancaba con el modelo y el
- * monto de hace semanas. Ahora, para cualquier chat, si la última actividad es más
- * vieja que DATOS_VIEJOS_HORAS, el próximo mensaje se atiende como consulta nueva
- * (index.js, antes de interpretar): lo de `RESET_DE_LA_CHARLA` y además esto.
- *
- * Lo que NO se toca: `nombre`, `zona`, `notas`, `modelosPedidos`, el `historial`,
- * `temasExplicados`, `resultado`, `botEnvio` y los recordatorios.
- *
- * `leadRegistrado` sí se limpia (Pendientes 2, decisión de Tomás del 21/09/2026):
- * sobrevivía a todo, así que un contacto que volvía semanas después y volvía a escalar
- * avisaba al grupo pero no sumaba fila en LEADS. Va acá y no en `RESET_DE_LA_CHARLA`:
- * la vuelta de un escalado a las 24 h sigue sin sumar fila.
+ * Datos viejos por tiempo (Pendientes 1, B3, decisión de Tomás del 18/09/2026): para
+ * cualquier chat, si la última actividad es más vieja que DATOS_VIEJOS_HORAS, el próximo
+ * mensaje se atiende como consulta nueva (index.js, antes de contestar): lo de
+ * `RESET_DE_LA_CHARLA` y además esto. No se toca `nombre`, el `historial`, `resultado`,
+ * `botEnvio` ni los recordatorios.
  */
 const DATOS_QUE_CADUCAN = {
-  // Lo que dijo el cliente en la charla vieja, que ya no vale para una consulta nueva.
-  modelo: null,
-  modeloPropuesto: null,
-  entrega: null,
-  // Bloque 10: un monto en dólares ("tengo 420 dólares"), que no es una entrega en pesos.
-  entregaDolares: null,
-  // 🔔 LEAD (13/10/2026): la última entrega cotizada para el aviso al grupo; caduca como `entrega`.
-  entregaAviso: null,
-  forma_pago: null,
-  capacidad_gb: null,
-  permuta: null,
-  presupuestoAnotado: null,
-  timing: null,
-  // Marcas del bot que no tienen que sobrevivir a una consulta nueva. Las de
-  // RESET_DE_LA_CHARLA (lista, stock, cotización, `cotizadoDeContado`…) van aparte.
-  // `saludoEn` (bloque 9): cuándo salió el último saludo. Reemplaza a `yaSaludo`, que no
-  // se lee más; a las 72 h ya es otro día igual, y #reset lo borra con el chat entero.
+  // El saludo de la charla vieja: a las 72 h ya es otro día.
   saludoEn: null,
-  primerIphoneDicho: false,
-  permutaDatosPedidos: false,
-  permutaSinDatosDicho: false,
-  compromisoEnviado: false,
-  descuentoPedidos: null,
-  descuentoDe: null,
-  // El lead de la consulta vieja: si vuelve a escalar, es una fila nueva en LEADS.
-  leadRegistrado: null,
+  // Lo último que contestó Sonnet en la charla vieja.
+  ultimaRespuestaSonnet: null,
 };
 
 /**
- * Devuelve si además había un escalado abierto, que queda resuelto. Un escalado de
- * "no entendí" no calla el chat, así que nunca vence (`vencido` solo se mira en los
- * callados): si nadie lo tomaba quedaba `escalado` para siempre, y la consulta nueva
- * no podía escalar, callar ni anotar su fila.
- *
- * OJO con el orden: `resolver` completa `leadRegistrado` con la fecha del escalado.
- * Tiene que correr ANTES de limpiar; después, ese escalado viejo volvería a tapar el
- * lead y la consulta nueva se quedaría sin su fila.
+ * Devuelve si además había un escalado abierto, que queda resuelto. Un escalado que
+ * no calla nunca vence (`vencido` solo se mira en los callados): si nadie lo tomaba
+ * quedaba `escalado` para siempre, y la consulta nueva no podía escalar ni callar.
  */
 function limpiarDatosViejos(chatId) {
   const habiaEscalado = resolver(chatId, `datos viejos: más de ${config.datosViejosHoras} h sin actividad`);
@@ -180,12 +114,12 @@ function limpiarDatosViejos(chatId) {
 
 /**
  * La última actividad del chat: el `ts` más nuevo del historial, de cualquiera de los
- * dos lados; si no hay historial, el de la última lectura (`ultimaLectura.ts`, que
- * responder.js anota al interpretar cada mensaje). 0 si no hay nada con fecha.
+ * dos lados; si no hay historial, el de la última lectura (`ultimaLectura.ts`, de los
+ * estados de antes). 0 si no hay nada con fecha.
  *
- * Una foto sin epígrafe ("[foto]", que index.js anota en los chats de Sonnet desde el
- * 07/10/2026) no cuenta: hasta ahí no entraba al historial, y una foto suelta que nadie
- * contesta no tiene que salvar de los datos viejos al texto que llega después.
+ * Una foto sin epígrafe ("[foto]", que index.js anota en el historial) no cuenta: una
+ * foto suelta que nadie contesta no tiene que salvar de los datos viejos al texto que
+ * llega después.
  */
 function ultimaActividad(s) {
   if (!s) return 0;
@@ -204,16 +138,11 @@ function horasViejas(ultima, ahora = Date.now()) {
   return horas > config.datosViejosHoras ? Math.round(horas) : 0;
 }
 
-/** Limpia el escalado; el lead ya anotado sigue anotado. Devuelve si había algo que limpiar. */
+/** Limpia el escalado. Devuelve si había algo que limpiar. */
 function resolver(chatId, porque, ahora = Date.now()) {
   const s = state.obtener(chatId);
   if (!s.escalado) return false;
-  state.actualizar(chatId, {
-    escalado: false,
-    escaladoResuelto: { ts: ahora, porque },
-    // Un escalado en vivo siempre anotó su lead, también los de antes de esta marca.
-    leadRegistrado: s.leadRegistrado || s.escaladoEn || ahora,
-  });
+  state.actualizar(chatId, { escalado: false, escaladoResuelto: { ts: ahora, porque } });
   return true;
 }
 
@@ -292,12 +221,12 @@ function contar(todos = state.todos()) {
 }
 
 /**
- * ¿#pausa, #sigue o #sinstock? Como los demás comandos, solo si el mensaje EMPIEZA con
+ * ¿#pausa o #sigue? Como los demás comandos, solo si el mensaje EMPIEZA con
  * él: los avisos del bot vuelven por el webhook y los nombran en el medio. `numero` son
  * los dígitos que vengan después ('' si no hay); solo se usa desde el grupo.
  */
 function comando(texto) {
-  const m = String(texto || '').trim().match(/^#(pausa|sigue|sinstock)(?![\p{L}\p{N}_])([\s\S]*)$/iu);
+  const m = String(texto || '').trim().match(/^#(pausa|sigue)(?![\p{L}\p{N}_])([\s\S]*)$/iu);
   return m ? { tipo: m[1].toLowerCase(), numero: m[2].replace(/\D/g, '') } : null;
 }
 
@@ -313,20 +242,12 @@ function reanudar(chatId, ahora = Date.now()) {
 
 const COMO_SE_USA =
   'En el chat del cliente: #pausa o #sigue\n' +
-  'En el grupo, con su número: #pausa 5492990000000 o #sigue 5492990000000 (sirve pegar el wa.me del resumen)';
-
-const COMO_SE_USA_SINSTOCK =
-  'En el grupo, con el número del cliente, después de un aviso de fotos pedidas: #sinstock 5492990000000\n' +
-  'Le manda la foto de referencia de cada modelo que pidió, sola y sin texto. El chat sigue escalado: para que el bot vuelva, #sigue.';
+  'En el grupo, con su número: #pausa 5492990000000 o #sigue 5492990000000 (sirve pegar el wa.me de un aviso)';
 
 /**
- * #pausa / #sigue / #sinstock escritos en el grupo interno, con el número. Busca el chat
- * con la misma comparación que #vendido / #perdido; sin un único chat que coincida,
- * contesta por qué y no toca nada.
- *
- * #sinstock (bloque 8, decisión de Tomás del 24/09/2026) no cambia nada acá: devuelve el
- * chat y su pedido de fotos pendiente (`pedido`), y las fotos las manda index.js por el
- * camino de siempre. Sin pedido pendiente contesta cómo se usa.
+ * #pausa / #sigue escritos en el grupo interno, con el número. Busca el chat con la
+ * misma comparación que #vendido / #perdido; sin un único chat que coincida, contesta
+ * por qué y no toca nada.
  *
  * #sigue que contesta (decisión de Tomás del 07/10/2026): con `alSeguir` (lo pasa index.js), ya
  * reactivado el chat, `alSeguir(chatId, ahora)` decide si le contesta lo que dejó escrito y lo deja en
@@ -335,12 +256,12 @@ const COMO_SE_USA_SINSTOCK =
  * curso, `enCurso`: "… y ya le estoy contestando lo que escribió") y `contesta` le avisa a index.js que
  * arranque la tanda. Sin `alSeguir`, como antes.
  *
- * @returns {{chatId:string|null, tipo:string, cambio:boolean, aviso:string|null, pedido?:object, contesta?:boolean}}
+ * @returns {{chatId:string|null, tipo:string, cambio:boolean, aviso:string|null, contesta?:boolean}}
  */
 function desdeGrupo({ tipo, numero }, ahora = Date.now(), { alSeguir = null } = {}) {
   const nada = (aviso) => ({ chatId: null, tipo, cambio: false, aviso });
-  const comoSeUsa = tipo === 'sinstock' ? COMO_SE_USA_SINSTOCK : COMO_SE_USA;
-  const noToque = tipo === 'sinstock' ? 'No mandé nada.' : 'No toqué nada.';
+  const comoSeUsa = COMO_SE_USA;
+  const noToque = 'No toqué nada.';
   if (!numero) {
     return nada(`❓ Desde el grupo, #${tipo} va con el número del cliente, así sé qué chat es. ${noToque}\n\n${comoSeUsa}`);
   }
@@ -348,7 +269,7 @@ function desdeGrupo({ tipo, numero }, ahora = Date.now(), { alSeguir = null } = 
     comando: `#${tipo}`,
     numero,
     nada: noToque,
-    verbo: { pausa: 'pausar', sigue: 'reactivar', sinstock: 'usar' }[tipo],
+    verbo: { pausa: 'pausar', sigue: 'reactivar' }[tipo],
     comoSeUsa,
   });
   if (!elegido.chatId) return nada(elegido.aviso);
@@ -356,12 +277,6 @@ function desdeGrupo({ tipo, numero }, ahora = Date.now(), { alSeguir = null } = 
   const chatId = elegido.chatId;
   const s = { ...state.obtener(chatId) };
   const link = `💬 https://wa.me/${chatId.split('@')[0]}`;
-  if (tipo === 'sinstock') {
-    if (!s.fotosPedidas) {
-      return { chatId, tipo, cambio: false, aviso: `❓ ${quien(chatId, s)} no tiene fotos pedidas pendientes. ${noToque}\n${link}\n\n${comoSeUsa}` };
-    }
-    return { chatId, tipo, cambio: false, aviso: null, pedido: s.fotosPedidas };
-  }
   if (tipo === 'pausa') {
     if (s.pausado) return { chatId, tipo, cambio: false, aviso: `⏸️ ${quien(chatId, s)} ya estaba pausado, no cambié nada\n${link}` };
     pausar(chatId);

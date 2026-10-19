@@ -1,25 +1,20 @@
 'use strict';
 /**
- * El interruptor general de Chiara (panel Chiara, 06/10/2026; diseño cerrado por Tomás el 05/10 en el
- * Cortex: areas/ventas-mensajes/panel-chiara.md).
- *
- * Se apaga y se prende desde el panel de la app de ventas (bot_ordenes: 'apagar' / 'prender'; lo aplica
- * src/panel-chiara.js). Apagada, Chiara no le contesta a NINGÚN cliente y no llama a Sonnet ni a Gemini:
- *   - index.js: la tanda no se interpreta (atenderTanda), ni el seguimiento ni el barrido del silencio;
+ * El interruptor general del bot (nació con el panel de iPhone el 06/10/2026; en Piedra queda solo el
+ * local, sin panel: poda del 19/10/2026). `#apagar` y `#prender`, escritos por la cuenta en el grupo
+ * interno (`comando` y `desdeGrupo`; los llama index.js). Apagado, el bot no le contesta a NINGÚN
+ * cliente y no llama a Sonnet ni a Gemini:
+ *   - index.js: la tanda no se interpreta (atenderTanda), ni el barrido del silencio, ni #sigue;
  *   - sombra-persona.js: no piensa en sombra;
- *   - evolution.js: ningún envío a un cliente sale (texto, foto, PDF, "escribiendo…"), como segunda traba.
- * Igual lee: cada mensaje entra al historial y al registro de aprendizaje, se cuenta y se reporta al
- * panel, y los avisos al grupo, el resumen y los comandos siguen. Lo que escribieron mientras estaba
- * apagada no se contesta solo al prenderla.
+ *   - evolution.js: ningún envío a un cliente sale (texto, foto, documento, "escribiendo…"), como segunda traba.
+ * Igual lee: cada mensaje entra al historial y al registro de aprendizaje, y los avisos al grupo y los
+ * comandos siguen. Lo que escribieron mientras estaba apagado no se contesta solo al prenderlo.
  *
- * Queda en disco (`data/interruptor.json`, escritura atómica como estado.json): un reinicio no la prende.
- * Sin archivo, prendida. Si el archivo existe y no se puede leer (bloqueado por un antivirus, dañado),
- * queda APAGADA por las dudas y se vuelve a intentar en cada consulta; `problema()` dice por qué (el panel
- * lo avisa al grupo) y prenderla desde el panel escribe el archivo de nuevo.
- * Respaldo del panel (decisión de Tomás del 06/10/2026): `#apagar` y `#prender` escritos por la cuenta en el
- * grupo interno hacen lo mismo que el botón (`comando` y `desdeGrupo`; los llama index.js), y también arreglan
- * un archivo ilegible. Sin app ni grupo: borrar el archivo y reiniciar el bot. En las pruebas va al lado del ESTADO_PATH temporal (o en INTERRUPTOR_PATH).
- * No requiere nada del bot: lo usa evolution.js.
+ * Queda en disco (`data/interruptor.json`, escritura atómica como estado.json): un reinicio no lo prende.
+ * Sin archivo, prendido. Si el archivo existe y no se puede leer (bloqueado por un antivirus, dañado),
+ * queda APAGADO por las dudas y se vuelve a intentar en cada consulta; `problema()` dice por qué, y
+ * `#prender` escribe el archivo de nuevo. Sin grupo: borrar el archivo y reiniciar el bot. En las pruebas
+ * va al lado del ESTADO_PATH temporal (o en INTERRUPTOR_PATH). No requiere nada del bot: lo usa evolution.js.
  */
 const fs = require('fs');
 const path = require('path');
@@ -62,7 +57,7 @@ function leer() {
   }
   // No se pudo leer: apagada por las dudas, sin guardarlo en memoria (la próxima consulta vuelve a leer).
   if (!problemaLectura) {
-    console.error(`[interruptor] no pude leer ${ruta()} (${error.message}): Chiara queda APAGADA hasta poder leerlo o que la prendan desde el panel`);
+    console.error(`[interruptor] no pude leer ${ruta()} (${error.message}): el bot queda APAGADO hasta poder leerlo o que lo prendan con #prender`);
   }
   problemaLectura = error.message;
   return { prendida: false, cambio: null, por: 'archivo ilegible' };
@@ -107,7 +102,7 @@ function prendida() {
  * La prende (true) o la apaga (false). Devuelve true si cambió. Si no se puede escribir el archivo, el
  * cambio vale igual hasta el próximo reinicio y queda el error en la consola.
  */
-function poner(valor, por = 'panel', ahora = Date.now()) {
+function poner(valor, por = 'grupo', ahora = Date.now()) {
   const antes = leer();
   if (antes.prendida === Boolean(valor) && !problemaLectura) return false;
   actual = { prendida: Boolean(valor), cambio: ahora, por };
@@ -115,18 +110,18 @@ function poner(valor, por = 'panel', ahora = Date.now()) {
   try {
     escribir(actual);
   } catch (e) {
-    console.error(`[interruptor] no pude guardar que Chiara quedó ${valor ? 'prendida' : 'apagada'} (${e.message}): vale hasta el próximo reinicio`);
+    console.error(`[interruptor] no pude guardar que el bot quedó ${valor ? 'prendido' : 'apagado'} (${e.message}): vale hasta el próximo reinicio`);
   }
-  console.log(`[interruptor] Chiara ${valor ? 'PRENDIDA' : 'APAGADA'} (${por})`);
+  console.log(`[interruptor] bot ${valor ? 'PRENDIDO' : 'APAGADO'} (${por})`);
   return true;
 }
 
 // ------------------------------------------------------------ #apagar / #prender desde el grupo
 
 const TEXTO_APAGADA_GRUPO =
-  '⏸️ Chiara APAGADA desde el grupo: no le contesta a ningún cliente hasta que la prendan (#prender o el panel). Sigue leyendo y anotando.';
+  '⏸️ Bot APAGADO desde el grupo: no le contesta a ningún cliente hasta #prender. Sigue leyendo y anotando.';
 const TEXTO_PRENDIDA_GRUPO =
-  '▶️ Chiara PRENDIDA desde el grupo: vuelve a contestar. Lo que escribieron mientras estaba apagada no lo contesta sola ' +
+  '▶️ Bot PRENDIDO desde el grupo: vuelve a contestar. Lo que escribieron mientras estaba apagado no lo contesta solo ' +
   '(los chats que atendía una persona siguen como siempre: al vencer su silencio).';
 
 /**
@@ -144,17 +139,17 @@ function comando(texto) {
  * frena con #pausa.
  */
 function desdeGrupo({ tipo, resto }, ahora = Date.now()) {
-  if (resto && !/^chiara$/i.test(resto)) {
+  if (resto && !/^bot$/i.test(resto)) {
     return {
       tipo,
       cambio: false,
-      aviso: `❓ #${tipo} va solo, sin nada atrás: ${tipo === 'apagar' ? 'apaga' : 'prende'} a Chiara para TODOS los chats. No cambié nada. Para un chat solo: #pausa <número> / #sigue <número>.`,
+      aviso: `❓ #${tipo} va solo, sin nada atrás: ${tipo === 'apagar' ? 'apaga' : 'prende'} el bot para TODOS los chats. No cambié nada. Para un chat solo: #pausa <número> / #sigue <número>.`,
     };
   }
   const prender = tipo === 'prender';
   const cambio = poner(prender, 'grupo', ahora);
   if (!cambio) {
-    return { tipo, cambio, aviso: `ℹ️ Chiara ya estaba ${prender ? 'prendida' : 'APAGADA'}: no cambié nada.` };
+    return { tipo, cambio, aviso: `ℹ️ El bot ya estaba ${prender ? 'prendido' : 'APAGADO'}: no cambié nada.` };
   }
   return { tipo, cambio, aviso: prender ? TEXTO_PRENDIDA_GRUPO : TEXTO_APAGADA_GRUPO };
 }

@@ -23,7 +23,7 @@
  * - Solo las líneas con texto (un audio cuenta si ya se transcribió y se entendió).
  * - Con CEREBRO_MODO=apagado o en MODO_ESCUCHA, nada (en escucha el bot ya piensa en esos chats).
  * - Si el chat se reinicia (#reset) antes de pensar, no piensa.
- * - Con Chiara apagada desde el panel (src/interruptor.js, 06/10/2026), tampoco.
+ * - Con el bot apagado (#apagar, src/interruptor.js), tampoco.
  */
 const crypto = require('crypto');
 const config = require('./config');
@@ -47,7 +47,7 @@ let gasto = { dia: null, usd: 0, pensadas: 0, topeAvisado: false };
 
 /**
  * ¿Está prendida ahora? Con la fecha bien escrita, sin vencer, el cerebro prendido, fuera de escucha y
- * con Chiara prendida (panel Chiara).
+ * con el bot prendido (#apagar / #prender).
  */
 function activa(ahora = Date.now()) {
   const hasta = config.cerebro.sombraPersonaHasta;

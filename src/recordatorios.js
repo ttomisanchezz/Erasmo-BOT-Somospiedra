@@ -25,7 +25,7 @@
 const config = require('./config');
 const state = require('./state');
 const evolution = require('./evolution');
-const { partir, esTelefono, LARGO_MENSAJE } = require('./resumen');
+const { partir, esTelefono, LARGO_MENSAJE } = require('./avisos-texto');
 
 const DIA_MS = 24 * 60 * 60 * 1000;
 const BARRA = '━'.repeat(20);

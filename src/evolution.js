@@ -29,13 +29,13 @@ async function pedir(ruta, body) {
 }
 
 /**
- * Panel Chiara (06/10/2026): con Chiara apagada desde el panel (src/interruptor.js) no sale nada a un
+ * El interruptor general (src/interruptor.js, #apagar / #prender): apagado, no sale nada a un
  * cliente. Es la segunda traba: index.js ya no arma la tanda. El grupo interno sí recibe.
  */
 function apagadaPara(numero) {
   return !String(numero || '').endsWith('@g.us') && !interruptor.prendida();
 }
-const APAGADA = { bloqueado: true, motivo: 'Chiara apagada desde el panel' };
+const APAGADA = { bloqueado: true, motivo: 'bot apagado (#apagar)' };
 
 /** Manda un texto. `delay` hace que WhatsApp muestre "escribiendo…". */
 async function enviarTexto(numero, texto, delayMs = 1200) {
@@ -333,7 +333,7 @@ function avisosGrupo() {
   return { noSalieron: avisosNoSalidos.noSalieron, ultimo: avisosNoSalidos.ultimo ? { ...avisosNoSalidos.ultimo } : null };
 }
 
-/** Aviso al grupo interno de Tomi y Fran. */
+/** Aviso al grupo interno del negocio. */
 async function avisarGrupo(texto) {
   const motivo = motivoBloqueoAvisos();
   if (motivo) {

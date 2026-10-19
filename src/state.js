@@ -47,43 +47,18 @@ let danado = null;
 // con la respuesta y se confirman al salir: son contadores de control, no "ya se
 // dijo", y la migración de abajo no tiene por qué borrarlos.
 const MARCAS_DEL_BOT = [
-  'listaEnviada',
-  'stockInformadoDe',
-  'preciosMostradosDe',
-  'cotizadoDe',
-  'entregaCotizada',
-  // true si esa cotización fue solo de contado, false si tenía cuotas (Mejora 1).
-  'cotizadoDeContado',
-  'compromisoEnviado',
   // Hasta el bloque 9 (no se lee más): queda para los estados de antes del esquema 3.
   'yaSaludo',
-  // Bloque 9: cuándo salió el último saludo ("hoy ya saludó", responder.js `hablaronHoy`).
+  // Cuándo salió el último saludo.
   'saludoEn',
-  'preguntamosFormaPago',
-  'primerIphoneDicho',
-  // Bloque 5b: cuántas veces se le dijo la entrega inicial de cada modelo sin que
-  // llegara ({ 'iPhone 13': 2 }). Cada línea suma al salir. Reemplaza a `intentoEstirar`.
-  'insistenciaEntrega',
-  'puertaAbiertaDe',
-  'permutaDatosPedidos',
-  // Desde cero (D2, 29/09/2026): ya se le dijo "sin X no te puedo pasar el numero exacto" en
-  // este canje. A la segunda sin datos nuevos, escala callado.
-  'permutaSinDatosDicho',
-  'entregaRepreguntada',
   'acuseContestado',
-  // Bloque 5: cuántas veces pidió descuento (cada respuesta confirma su número) y el
-  // descuento que se le dio ({ modelo, precio }).
-  'descuentoPedidos',
-  'descuentoDe',
-  // Promo del Día de la Madre (12/10/2026, src/promo-madre.js): cuándo le llegó el saludo. Una sola vez por chat.
-  'promoMadreSaludo',
 ];
 
-// La única marca que se acumula: se le van sumando modelos.
-const MARCAS_QUE_SE_SUMAN = ['preciosMostradosDe'];
-// Marcas que son un objeto por modelo: lo que trae el mensaje se mezcla con lo que
-// había, sin pisar los otros modelos (bloque 5b).
-const MARCAS_QUE_SE_MEZCLAN = ['insistenciaEntrega'];
+// Marcas que se acumulan (una lista) o que son un objeto que se mezcla con lo que había. En Piedra
+// todavía ninguna (poda de iPhone, 19/10/2026: eran los modelos con precio y la insistencia de la
+// entrega); el mecanismo queda para cuando haya herramientas de precio.
+const MARCAS_QUE_SE_SUMAN = [];
+const MARCAS_QUE_SE_MEZCLAN = [];
 
 /**
  * Versión del estado guardado. Sube cuando un cambio deja los datos viejos
@@ -391,7 +366,7 @@ function guardarYa() {
  *
  * Existe por las tandas de index.js. Una tanda que ya estaba interpretando o
  * mandando cuando llegó un #reset sigue viva, y `decidir` lee y anota por chatId
- * después de cada await (Gemini, la planilla): sin esto volvería a crear el chat
+ * después de cada await (Sonnet, Evolution): sin esto volvería a crear el chat
  * con lo de antes del reset. index.js enchufa en `vigilarTandas` una función que
  * dice de qué generación es la tanda que está corriendo; si no es la del chat,
  * `obtener` (y con él todo lo que lee o escribe ese chat) tira ChatReiniciado.
@@ -695,20 +670,6 @@ function borrarRecordatorio(chatId) {
 }
 
 /**
- * #bateria (01/10/2026, decisión de Tomás): la lista de usados elegida ('85-93' es la pestaña
- * `LISTA 85-93`; null, LISTA). Bajo la clave interna: sobrevive a un reinicio y #reset no la
- * toca. Guarda YA, como los recordatorios: es una decisión de una persona.
- */
-function listaBateria() {
-  return interno().listaBateria || null;
-}
-
-function guardarListaBateria(rango) {
-  interno().listaBateria = rango || null;
-  guardarYa();
-}
-
-/**
  * El gasto de Sonnet del mes (bloque Ninjo 2, 06/10/2026): `{ mes: 'AAAA-MM', usd }`, el mes de
  * Argentina. Lo suma cerebro.js con cada llamada a la API (`sumarAlMes`), en el mismo lugar que el
  * gasto del día; /salud lo muestra. Bajo la clave interna: sobrevive a un reinicio y #reset no lo toca.
@@ -798,8 +759,6 @@ module.exports = {
   lineasDePersona,
   LINEAS_PERSONA,
   LARGO_HISTORIAL,
-  listaBateria,
-  guardarListaBateria,
   gastoSonnetMes,
   guardarGastoSonnetMes,
   gastoSonnetAvisado,
