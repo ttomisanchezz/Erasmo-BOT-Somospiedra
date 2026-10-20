@@ -7,7 +7,8 @@
  *   3. la validación del cuerpo: 400 (sin event, sin remoteJid, JSON roto), 403 (otra instancia, también
  *      somosiphone), 200 y nada para un evento que no es de mensajes;
  *   4. un mensaje repetido (mismo id) se procesa una sola vez;
- *   5. dos mensajes seguidos por el webhook se contestan juntos.
+ *   5. dos mensajes seguidos por el webhook se contestan juntos;
+ *   6. un chat que llega desde un anuncio de Meta queda con el id del anuncio (src/anuncio.js).
  *
  *   node test/piedra-webhook.test.js
  */
@@ -131,6 +132,26 @@ const upsert = (data, extra = {}) => ({ event: 'messages.upsert', instance: 'som
     await esperar(() => aClientes.length > 0);
     assert.strictEqual(sonnet.pedidos.length, 1);
     assert.match(sonnet.textoDelPedido(0), /"""\nhola\ntienen granza\?\n"""/);
+  });
+
+  await check('un chat que llega desde un anuncio de Meta queda con el id del anuncio (y otro mensaje no lo pisa)', async () => {
+    bot.reiniciarTopeWebhook();
+    const num = nuevo();
+    sonnet.porDefecto = sonnet.escala('algo');
+    try {
+      const desdeAnuncio = mensaje(num, 'Hola! Quiero granza', {
+        message: { extendedTextMessage: { text: 'Hola! Quiero granza', contextInfo: { externalAdReply: { sourceId: '120250759618840411', sourceType: 'ad', title: 'Tu jardín listo' } } } },
+      });
+      assert.strictEqual((await pedir('POST', '/webhook/' + SECRETO, upsert(desdeAnuncio))).status, 200);
+      assert.ok(await esperar(() => Boolean(state.todos()[jid(num)] && state.todos()[jid(num)].anuncio)), 'no anotó el anuncio');
+      assert.strictEqual(state.todos()[jid(num)].anuncio.id, '120250759618840411');
+      await pedir('POST', '/webhook/' + SECRETO, upsert(mensaje(num, 'son 10 m2')));
+      await p.dormir(80);
+      assert.strictEqual(state.todos()[jid(num)].anuncio.id, '120250759618840411');
+      assert.ok(!state.todos()[jid(num)].anuncioUltimo);
+    } finally {
+      sonnet.porDefecto = null;
+    }
   });
 
   await check('/salud contesta sin datos de clientes ni el secreto', async () => {

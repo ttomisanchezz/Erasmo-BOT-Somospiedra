@@ -45,6 +45,7 @@ const fotosDelCliente = require('./fotos-del-cliente');
 const contexto = require('./contexto');
 // El texto de un mensaje, compartido con contexto.js, y la línea "[foto]" de una foto sin epígrafe.
 const { textoDelMensaje, marcadorSinTexto, LINEA_FOTO, esFotoDelCliente, conCita, sinCita } = require('./texto-del-mensaje');
+const anuncio = require('./anuncio');
 // El interruptor general (#apagar / #prender).
 const interruptor = require('./interruptor');
 // Acuses y agradecimientos: el barrido del silencio y #sigue no contestan solo eso.
@@ -391,6 +392,22 @@ async function procesar(data) {
   // anotado con la hora de este mensaje, ANTES de entrar al estado.
   if (!data?.key?.fromMe) {
     chatsViejos.entroDelCliente(chatId, Number(data?.messageTimestamp?.low ?? data?.messageTimestamp ?? 0) * 1000);
+  }
+
+  // De qué anuncio de Meta vino el chat (src/anuncio.js): queda en el estado y en el aprendizaje, en todos los
+  // modos (también apagado y en escucha). Solo anota; no cambia qué se contesta.
+  if (!data?.key?.fromMe) {
+    try {
+      const deAnuncio = anuncio.anuncioDe(data);
+      const cambios = anuncio.cambiosDeEstado(state.obtener(chatId), deAnuncio);
+      if (cambios) {
+        state.actualizar(chatId, cambios);
+        aprendizaje.anotar('anuncio', chatId, { anuncio: deAnuncio.id, titulo: deAnuncio.titulo, id: data?.key?.id });
+        console.log(`[anuncio] ${chatId}: llego desde el anuncio ${deAnuncio.id || 'sin id'}`);
+      }
+    } catch (e) {
+      console.error(`[anuncio] ${chatId}: no pude anotar el anuncio:`, e.message);
+    }
   }
 
   let texto = textoDelMensaje(data);
