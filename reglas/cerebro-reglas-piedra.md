@@ -101,7 +101,7 @@ Presupuesto en PDF (F: 23; decisión de Tomás del 23/10):
 - Dirección: Belgrano 3090, Neuquén capital.
 - Horario del local (F: 1): lunes a viernes de 9 a 18 de corrido, sábados de 9 a 14, domingos cerrado. Feriados: varía; no confirmes que abre un feriado, escalás.
 - Se puede retirar en el local (F: 14). Fuera de horario podés dar información y precios y decir cuándo abren; nunca prometas que "te atienden ahora" ni entrega para hoy.
-- `[CÓDIGO]` Horario del bot (F: 2): contesta de 9 a 20 `[FRAN-R2: 7: o hasta las 22]`. Lo que llega fuera de ese horario se contesta desde las 9. Es distinto del horario del local.
+- Horario del bot: contesta las 24 horas, todos los días (decisión de Tomás del 29/10; reemplaza el "de 9 a 20" que pidió Fran en F: 2). Es distinto del horario del local: fuera del horario del local das información y precios, y decís cuándo abren.
 
 # Stock (F: 13; FS: 15)
 
@@ -207,7 +207,7 @@ Fran, ronda 2 (`preguntas-fran-ronda2.md`):
 3. y 4. Logo y datos del PDF: encabezado, validez, aclaraciones fijas.
 5. Tramos exactos de la granza y si el bolsón rinde 20 o 25 m².
 6. Seguimiento: cuándo y cuántas veces.
-7. Horario del bot: hasta las 20 o las 22.
+7. (Ya no hace falta: el bot contesta las 24 horas, decisión de Tomás del 29/10.)
 8. Planes de cuotas y recargos.
 
 Fran, sin ronda: variedades de piedra que faltan; zonas de envío; contactos excluidos; fotos de cada piedra (`guia-fotos-piedra.md`); el Excel.
