@@ -1,0 +1,78 @@
+SOMOS PIEDRA — CONFIGURACIÓN DEL SIMULADOR DE FOTOS Y APP DE GESTIÓN
+Documento de respuestas para Claude / Tommy
+Fecha: 23/10/2026
+
+OBJETIVO
+Este documento complementa la configuración comercial del agente de Somos Piedra. Contiene las respuestas sobre el simulador visual de piedras y la futura aplicación administrativa. No sustituye las reglas comerciales ya entregadas. No dar por confirmados datos que se indican como pendientes.
+
+PARTE A — SIMULADOR VISUAL CON IA
+
+1. FOTOS DE REFERENCIA DE CADA PIEDRA
+La idea es cargar unas 4 o 5 fotografías de referencia por variedad de piedra, para que el simulador pueda representar mejor sus colores, texturas, tamaños, patrones y aspecto real. No es necesario exigir 10 imágenes por variedad. Se busca que las referencias incluyan, cuando sea posible, una superficie de aproximadamente 1 m² de piedra apoyada en el piso o ya colocada. Pedimos a Claude que nos indique cómo fotografiar cada piedra: distancia, ángulos, iluminación, escala y condiciones de captura, para conseguir resultados fieles.
+
+2. FOTOS QUE DEBE ENVIAR EL CLIENTE
+Lo ideal es pedir solo 1 o 2 fotografías del espacio que quiere modificar, según la complejidad del trabajo. No pedir 10 fotos al cliente. El bot debe enviar instrucciones simples y concretas para sacar buenas fotos: mostrar toda la superficie, tomar la imagen con buena iluminación, evitar obstáculos y filtros, mantener una perspectiva clara y, si es necesario, incluir otra vista. Claude debe diseñar las instrucciones finales.
+
+3. FIDELIDAD DE LA SIMULACIÓN
+El objetivo es mostrar una aproximación realista de cómo quedaría la piedra en la pared, piso, frente, quincho, jardín u otro lugar elegido. La IA debe conservar al máximo la foto original: no cambiar ventanas, puertas, aberturas, techo, mobiliario, proporciones, geometría, colores ajenos a la intervención ni elementos que el cliente no pidió modificar. Debe alterar solamente la superficie seleccionada, respetar perspectiva, iluminación y sombras, y reproducir fielmente los colores, textura y patrón de la piedra de referencia. La simulación es orientativa, no una garantía de resultado exacto. Si el sistema no puede preservar algún detalle, debe comunicar la limitación y permitir revisar o repetir la simulación.
+
+4. QUÉ PIEDRA RECOMENDAR SEGÚN LA SUPERFICIE
+No usar una clasificación rígida del tipo 'una piedra solo sirve para exterior' o 'otra solo para interior'. Muchas piedras pueden servir para varias superficies: fachadas, paredes interiores, quinchos, pisos y caminos. La compatibilidad depende de las características de la piedra, del uso, del soporte y de las condiciones del lugar. En jardines, la granza suele ser una opción; para caminos también puede haber otras piedras. Antes de recomendar, preguntar por el uso y las condiciones relevantes, sin inventar compatibilidades técnicas. Cuando haga falta, derivar a una persona.
+
+5. FLUJO DESPUÉS DE GENERAR LA SIMULACIÓN
+Enviar la simulación indicando que es una vista aproximada. Esperar la respuesta del cliente, en vez de intentar cerrar inmediatamente. Si le interesa, consultar o confirmar los metros cuadrados para poder cotizar con la lista vigente. El bot puede informar y preparar la cotización; el cierre de venta corresponde al equipo humano. Respetar las reglas del documento comercial anterior.
+
+PARTE B — APP DE ADMINISTRACIÓN Y GESTIÓN
+
+6. CUENTAS Y MEDIOS POR LOS QUE INGRESA EL DINERO
+Actualmente las transferencias ingresan en cuentas bancarias del padre del usuario; el efectivo entra en caja y los cheques se reciben a nombre del negocio. Esta estructura cambiará por el traspaso de titularidad previsto; por eso los datos concretos de cuentas, titulares y conciliación quedan pendientes de confirmación. No inventar bancos, números de cuenta ni alias. Los alias se envían exclusivamente por el personal, no por el bot.
+
+7. CAMBIO DE TITULARIDAD Y FACTURACIÓN
+Se prevé facturar a nombre de Franco Nicolás Muñoz, sujeto a confirmación por el contador y al alta correspondiente. Se mencionó un cambio de titularidad con fecha '1 del 10', pero no debe asumirse como fecha efectiva sin confirmación. Diseñar la app para que pueda cambiarse la titularidad y conservarse el historial correctamente.
+
+8. PROVEEDORES
+Se compra material en distintas procedencias, entre ellas Los Menucos, Zapala, San Luis y Mar del Plata. Hay proveedores específicos adicionales, incluido Alessandrini. El detalle se analizará en el Excel que se compartirá posteriormente. No deducir que cada localidad sea el nombre de un proveedor.
+
+9. EXCEL EXISTENTE COMO FUENTE DE REFERENCIA
+El usuario proporcionará una copia de un Excel real de la operación del negocio. Claude debe analizar sus hojas, encabezados, fórmulas, categorías, movimientos y relaciones antes de diseñar el modelo de datos de la app. No asumir que el archivo ya fue recibido. Contiene, entre otros, registros de ventas por mes, gastos diarios, gastos fijos, proveedores, deudas, pagos y saldos.
+
+10. REGISTRO DE VENTAS
+En hojas como 'octubre ventas' se registra cómo se cobró cada venta: efectivo, débito, crédito, transferencia o cheque. Hay observaciones. Cuando es importante, hacia la derecha se consignan nombre del cliente, teléfono y pagos pendientes. El diseño de la app debe preservar esta información y permitir seguimiento de saldos pendientes.
+
+11. REGISTRO DE GASTOS
+En hojas como 'octubre gastos', el padre del usuario anota gastos diarios. Existen también registros de gastos fijos en Neuquén. La app debe permitir diferenciar gastos diarios, gastos fijos, pagos a proveedores y otros movimientos, siguiendo la organización real del Excel cuando se analice.
+
+12. PROVEEDORES, DEUDAS, PAGOS Y SALDOS
+El Excel tiene un apartado de proveedores, deudas, pagos y saldos. Es necesario poder registrar cuánto se debe, cuánto se pagó, cuándo y cuánto queda pendiente, con trazabilidad. No inventar saldos sin revisar el archivo.
+
+13. MOVIMIENTOS RELACIONADOS CON CINCO SALTOS
+Existe un registro de lo que se lleva a Cinco Saltos, relacionado con otro negocio. No debe interpretarse como una segunda sucursal propia de Somos Piedra. Claude debe examinar el Excel para comprender cómo registrar esas salidas o movimientos y evitar mezclarlos con ventas normales sin fundamento.
+
+14. NOMBRES Y ALIAS INTERNOS
+Es importante preservar los nombres y apodos con los que el padre identifica a proveedores, materiales o contactos, incluso si son informales, porque así reconoce cada registro. Por ejemplo, puede identificar a un proveedor mediante un apodo o anotar el material como 'piedra ocre'. La app debería admitir un nombre interno o alias junto al nombre formal cuando exista, sin reemplazar la identidad legal para facturación o documentos oficiales.
+
+15. STOCK
+Actualmente no hay inventario digital completo. Habrá que realizar un recuento físico para cargar existencias iniciales. No mostrar cantidades exactas ni confirmar disponibilidad basándose en un stock inexistente. Diseñar una carga inicial y un mecanismo posterior de entradas, salidas y ajustes.
+
+16. QUIÉN REGISTRA LAS VENTAS
+Lo ideal es que el padre del usuario siga siendo quien carga las ventas en la aplicación, como lo hace actualmente. La interfaz debe ser simple, rápida y cómoda para su manera de trabajar. La app puede tener distintos permisos o roles, pero no asumir usuarios concretos adicionales hasta definirlos.
+
+17. COSTOS DE ENVÍO
+No existe una tabla fija de envíos por localidad. Se cotiza caso por caso según distancia, cantidad, peso, material y viabilidad del transporte. Por ejemplo, para dos bolsas entregadas muy cerca podría no cobrarse flete. El sistema debe permitir indicar un costo de envío personalizado, incluso cero cuando lo autorice una persona. No establecer tarifas automáticas inventadas.
+
+18. CONTACTOS A LOS QUE EL BOT PUEDE O NO RESPONDER
+Se mencionó una lista de 52 contactos marcados. El equipo definirá manualmente cuáles deben atenderse y cuáles deben excluirse. No asumir que los 52 están bloqueados. Preparar un sistema editable de permisos/exclusiones por contacto, con suspensión de respuestas automáticas y seguimientos para los excluidos.
+
+19. MATERIAL QUE SE ENTREGARÁ MÁS ADELANTE
+- Copia del Excel de gestión para analizar su estructura y datos.
+- Fotos reales de cada variedad de piedra.
+- Fotos de espacios de clientes para pruebas del simulador; algunas ya se solicitaron.
+- Lista de contactos y criterios de inclusión/exclusión.
+- Confirmación de titularidad, cuentas y condiciones administrativas.
+- Recuento de stock y otros detalles pendientes.
+
+20. PRÓXIMOS PASOS SOLICITADOS A CLAUDE
+Primero, explicar exactamente cómo deben tomarse las 4 o 5 fotos de referencia de cada piedra y las 1 o 2 fotos que pediremos al cliente. Después, proponer un flujo de simulación que preserve la arquitectura y el entorno originales y solo modifique la superficie indicada. En paralelo, esperar el Excel y analizarlo antes de definir las pantallas y el modelo administrativo. Identificar qué información sigue pendiente, sin completar huecos con supuestos.
+
+REGLA FINAL
+El simulador ayuda a visualizar una posible colocación, no reemplaza el asesoramiento técnico ni garantiza un resultado idéntico. La app debe reflejar la operatoria real del negocio, respetar la intervención humana en cobros y ventas, y ser adaptable al futuro cambio de titularidad.
