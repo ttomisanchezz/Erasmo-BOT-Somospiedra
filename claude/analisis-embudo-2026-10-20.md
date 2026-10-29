@@ -125,3 +125,25 @@ Ningún anuncio menciona envío gratis, cuotas, formas de pago ni precios. Bien.
 2. Medición: mensaje armado con código por anuncio y/o el bot guardando el id del anuncio.
 3. Si se adelanta el corte del v2 al 22/10.
 4. Fotos o videos de obras propias para autoridad.
+
+## Decisiones de Tomás (20/10/2026, 15:53)
+- OK 1: el 22/10, si el TEST v2 sigue arriba de $1.500 por chat, el v2 baja de $13.000 a $9.000 por día, la MADRE sube de $7.000 a $9.000 y C1 Frente pasa a su propio conjunto con $2.000 (total $20.000).
+- OK 2: desde el 26/10, MADRE $9.000 + laboratorio 4 × $2.000 + remarketing $3.000.
+- OK 3: mensaje armado con código en cada anuncio (lo carga Tomás en el Administrador).
+- Granza: la bolsa sale $22.000, cubre 1 m² a 3 cm y deja unos $7.000 de ganancia. El costo máximo por venta es $7.000 × bolsas ÷ 3: con 10 bolsas da $23.333 (con $549 por chat, 1 venta cada 42 chats). FALTA DATO: cuántas bolsas lleva una venta típica.
+- Medición: opción b. El bot guarda el id del anuncio (commit 73746f4, `npm run anuncios`). Arranca a contar cuando se reinicie el bot.
+- Corte del v2: opción a (22/10, umbral de $1.500).
+- Autoridad: Tomás pidió generarla con IA y código HTML. Pendiente: confirmar que se arme con datos reales (reseñas, acopio, camioneta), sin obras inventadas.
+- 20/10 16:40: subida la campaña LAB Autoridad 120250880028210411 (ABO), conjunto 120250880035380411 con $3.000/día y anuncio A1 120250880047220411 (7 placas de obras reales del catálogo). Total de la cuenta: $23.000/día (Tomás).
+
+## 22/10/2026: test 1-3-6 con la fórmula de la granza (Tomás)
+- La cuenta estaba en $9.000/día (solo la MADRE). El v2 y la Autoridad se pausaron el 21/10 desde otro chat.
+- Decisión de Tomás: replicar la fórmula de la granza, un producto por conjunto, total $24.000/día con la MADRE en $9.500.
+- La fórmula del ganador C5 es el estilo v1: foto real a sangre con franja oscura, paso a paso, el número de "cuánto comprar" y "te lo llevamos". El v2 (fondo negro) con el mismo mensaje salía unas 4 veces más caro.
+- Campaña TEST 1-3-6 120250912907900411 (ABO):
+  - T1 Granza 120250912908830411, $4.900/día: G1 a G6;
+  - T2 Frente 120250912909580411, $4.800/día: F1 a F6 (F3 es el creativo del C1);
+  - T3 Patio y pileta 120250912910180411, $4.800/día: P1 a P6.
+- MADRE: $9.500/día. Total: $24.000/día.
+- Placas en `E:\anuncios somos piedra\anuncios-v2\final\test136\` (urls en `urls.json`). Generador: `gen.py` del scratchpad de la sesión, que no quedó en el repo.
+- Corte propuesto: apagar el anuncio que gasta $3.000 sin chats o que pasa los $1.500 por chat. Validado: 5 chats o más por conjunto a un costo aceptable (granza hasta unos $900).
