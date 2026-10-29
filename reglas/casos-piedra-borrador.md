@@ -75,8 +75,32 @@ Dependencias: `[P]` necesita planilla de prueba; `[F]` el resultado final depend
 | 36 | (heredado) | Cliente manda 5 mensajes seguidos en 20 segundos preguntando cosas distintas | RESPONDE una sola vez, hasta 4 mensajes de 300 caracteres como máximo; lo que no puede contestar va a ESCALA. `[H]` |
 | 37 | (heredado) | Número de la lista de ignorados escribe una consulta | MUDO; no escala. `[F]` |
 
+## F. Chats de los anuncios (13/10 al 28/10)
+
+Agregados el 29/10/2026 con los 379 chats que entraron por los anuncios (`data/historial/export-2026-10-28-1136`). Se escribieron contra las reglas v2 (`cerebro-reglas-piedra.md`, con las respuestas de Fran del 23/10). La columna Origen es el número de chat en `reactivacion-2026-10-28/t.txt`. Mismo criterio: texto parafraseado, sin nombres ni montos reales.
+
+| # | Origen | Escribe el cliente | Esperado |
+|---|---|---|---|
+| 38 | 8, 14 | "Hola! Quiero granza para mi jardín, son unos __ m²." (el texto del anuncio, sin completar) | RESPONDE: muestra los colores (si hay fotos de catálogo) y pregunta cuántos m² quiere cubrir. NO da precio todavía. |
+| 39 | 157, 325 | "Hola! Quiero granza para mi jardín, son unos 20 m²." | RESPONDE con la cantidad y el total de `cotizar` para 20 m², precio de efectivo y la aclaración de que con tarjeta es otro. `[P]` |
+| 40 | 21, 86 | "Son 6 m². Me lo traen a domicilio?" | RESPONDE el total de la piedra con `cotizar` y ESCALA el envío ("pide envío, 6 m² de granza"): no hay tarifa. Si no puede las dos cosas en una respuesta: ESCALA. `[P]` |
+| 41 | 120, 256 | "Cuánto cubre el bolsón? Y la tela antimaleza la venden?" | RESPONDE: la cobertura y la tela salen de la planilla; si el bolsón no tiene cobertura cargada: ESCALA. NO repite "20" ni "25" de memoria. `[P][F]` |
+| 42 | 207, 335 | "Y con tarjeta en cuántas cuotas?" | RESPONDE que se puede pagar en cuotas con tarjeta; los planes y recargos: ESCALA "pregunta planes de cuotas". NO calcula cuotas. |
+| 43 | 31 | "Uh, en otro lado pagué la mitad por el bolsón" | RESPONDE "¿Tenés algún otro presupuesto? Si querés, mandámelo y lo vemos." Si manda el presupuesto o pide que le mejoren el precio: ESCALA. |
+| 44 | 344 | "Calculo que voy a necesitar como 100 m²" | ESCALA "pedido de unos 100 m² de granza" (más de 100 m² escala). |
+| 45 | 232 | "Somos un estudio de Buenos Aires, buscamos 1000 m² de laja. Nos mandás presupuesto formal? Tienen cantera propia?" | ESCALA "estudio de Bs As pide presupuesto formal de 1000 m² de laja". NO dice si tienen cantera ni pasa proveedores. |
+| 46 | 12, 251 | "Ustedes hacen la colocación? Me pasás un colocador?" | RESPONDE que venden la piedra y la colocación no está incluida; el contacto del colocador lo pasa una persona: ESCALA "pide contacto de colocador". NO pasa contactos. |
+| 47 | 209, 375 | "Tienen piedra de río redonda, de esas para pisar descalzo?" | RESPONDE que no la trabajan (si no está en la planilla) y ofrece las que sí hay. NO manda a otro comercio con nombre. `[P]` |
+| 48 | 66, 255 | "Hacen mesadas de piedra?" | RESPONDE que no trabajan mesadas. NO nombra marmolerías. |
+| 49 | 336 | "Bueno, me las pueden traer?" + manda la ubicación | ESCALA "confirma compra de 7 bolsas y manda ubicación para la entrega". NO promete día ni horario. |
+| 50 | 343 | "A qué hora vienen con el resto de las piedras? Tengo que hacer trámites" | ESCALA "entrega pendiente, pide horario". NO inventa horario. |
+| 51 | 220, 235 | Manda 4 fotos del frente de su casa y pregunta cómo quedaría | RESPONDE ofreciendo el simulador (cuando esté). Hasta entonces: ESCALA "pide ver cómo quedaría con fotos del lugar". |
+| 52 | 164, 219, 281 | "¡Hola! Quiero más información" (texto del anuncio, nada más) | RESPONDE preguntando qué tiene pensado hacer (piso, pared, jardín). Nunca queda sin respuesta. |
+
+Casos viejos que cambian con las respuestas de Fran del 23/10 y las decisiones del 28/10 y 29/10 (revisar al pasarlos a código): 23 (el horario del local ya está confirmado: RESPONDE), 25 (el césped en rollo entra si está en la planilla), 27 (colocadores: escala, igual que el 46).
+
 ## Cobertura contra el historial
 
-- Los 37 casos cubren: variedades y precio (A), pago y factura (B), envío y seguimiento (C), productos fuera de catálogo (D) y contactos que no son clientes (E).
+- Los 52 casos cubren: variedades y precio (A), pago y factura (B), envío y seguimiento (C), productos fuera de catálogo (D) y contactos que no son clientes (E).
 - No se cubre todavía: mezcla de varios productos en un pedido, compras recurrentes de constructores, cheques y e-cheq, y reclamos por calidad de la piedra. Se agregan cuando Fran conteste.
 - Ningún caso asume un valor del local (horario, zona, alias, cuotas): en cada uno se indica `[F]` y el bot escala hasta tenerlo.
