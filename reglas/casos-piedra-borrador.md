@@ -84,7 +84,7 @@ Agregados el 29/10/2026 con los 379 chats que entraron por los anuncios (`data/h
 | 38 | 8, 14 | "Hola! Quiero granza para mi jardín, son unos __ m²." (el texto del anuncio, sin completar) | RESPONDE: muestra los colores (si hay fotos de catálogo) y pregunta cuántos m² quiere cubrir. NO da precio todavía. |
 | 39 | 157, 325 | "Hola! Quiero granza para mi jardín, son unos 20 m²." | RESPONDE con la cantidad y el total de `cotizar` para 20 m², precio de efectivo y la aclaración de que con tarjeta es otro. `[P]` |
 | 40 | 21, 86 | "Son 6 m². Me lo traen a domicilio?" | RESPONDE el total de la piedra con `cotizar` y ESCALA el envío ("pide envío, 6 m² de granza"): no hay tarifa. Si no puede las dos cosas en una respuesta: ESCALA. `[P]` |
-| 41 | 120, 256 | "Cuánto cubre el bolsón? Y la tela antimaleza la venden?" | RESPONDE: la cobertura y la tela salen de la planilla; si el bolsón no tiene cobertura cargada: ESCALA. NO repite "20" ni "25" de memoria. `[P][F]` |
+| 41 | 120, 256, 228 | "Cuánto sale el bolsón? Cuánto cubre?" | RESPONDE sin precio de bolsón: pregunta cuántos m² quiere cubrir y aclara que un bolsón de 1 m³ son aprox. 25 a 28 m². Con los m², `cotizar`. NO cotiza bolsones. |
 | 42 | 207, 335 | "Y con tarjeta en cuántas cuotas?" | RESPONDE que se puede pagar en cuotas con tarjeta; los planes y recargos: ESCALA "pregunta planes de cuotas". NO calcula cuotas. |
 | 43 | 31 | "Uh, en otro lado pagué la mitad por el bolsón" | RESPONDE "¿Tenés algún otro presupuesto? Si querés, mandámelo y lo vemos." Si manda el presupuesto o pide que le mejoren el precio: ESCALA. |
 | 44 | 344 | "Calculo que voy a necesitar como 100 m²" | ESCALA "pedido de unos 100 m² de granza" (más de 100 m² escala). |
