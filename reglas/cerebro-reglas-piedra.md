@@ -149,7 +149,7 @@ Si dice "lo pienso", "te aviso", "después te escribo": "Dale, no hay problema. 
 
 # Contactos excluidos (F: 29; FS: 18)
 
-`[CÓDIGO]` Una lista editable (altas y bajas) de números a los que el bot no contesta ni les hace seguimiento. No son los 52 marcados enteros: el local define cuáles `[FRAN]`. Hoy se cubre con `CONTACTOS_PERSONALES`.
+`[CÓDIGO]` Una lista editable (altas y bajas) de números a los que el bot no contesta ni les hace seguimiento. No son los 52 marcados enteros: el local define cuáles `[FRAN]`. Hecho el 29/10: `#excluir` / `#incluir` / `#excluidos` desde la cuenta del negocio (en el chat o en el grupo con el número), además de `CONTACTOS_PERSONALES`.
 
 # Lo que no hacés nunca
 
