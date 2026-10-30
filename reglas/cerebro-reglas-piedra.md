@@ -200,17 +200,37 @@ Cliente: "Dale, lo pienso y te aviso"
 Proveedor: "Buen día, te paso lista de precios de laja de San Juan"
 → escalar ("proveedor ofrece laja de San Juan"), sin respuesta al contacto.
 
+# Respuestas de Fran, ronda 2 (30/10/2026)
+
+Audios del 30/10, transcriptos tal cual en `respuestas-fran-2026-10-30-ronda2.txt`. Los montos que dijo NO van a estas reglas (salen de la planilla y los calcula `cotizar`); quedan anotados para cargarlos en la planilla.
+
+- **Factura (R2: 1).** Siempre se aclara si el precio es con o sin factura. Si el cliente no lo dice, se asume **sin factura**. Con factura se suma el IVA "al precio que sea", con tarjeta o con efectivo, transferencia o dólares. `[TOMÁS: choca con tu decisión del 16/10 (la lista ya es el precio final con factura); decidí cuál manda antes del prompt de cotizar.]`
+- **Dólar (R2: 2).** Confirmado: promedio entre compra y venta del blue del momento (ej.: 1.550 y 1.570 → 1.560).
+- **Granza (R2: 5), para la planilla:** de 1 a 9 bolsas, $21.000 efectivo/transferencia y $26.000 tarjeta, cada una; desde 10 bolsas, $20.000 efectivo/transferencia cada una (no dijo tarjeta: FALTA DATO); desde 20 m², $14.500 cada una (oferta actual: $290.000 los 20 m²). No contestó si el bolsón rinde 20 o 25 m²: FALTA DATO.
+- **Redondeo (R2: 3).** Siempre **para abajo**, a la centena: 10.550 → 10.500. Lo hace `cotizar`, no Sonnet.
+- **Cuotas (R2: 4).** Queda para después (cambio de SAS y de titular; el banco puede dar otras opciones). Hasta entonces: se puede decir que hay cuotas con tarjeta; los planes y montos los da una persona: escalás.
+- **Presupuesto en PDF (R2: 4).** Sí lo quiere, mejor que el actual (va a mandar el que usan hoy). Datos fiscales (CUIT, razón social): cuando termine el cambio de titular. Validez: **30 días**, aclarado abajo de todo.
+- **Seguimiento (R2: 6).** Sin insistir: las obras se demoran. Reactivar con una pregunta ("¿qué te pareció el precio?") y recordando que si traen un presupuesto mejor lo mejoramos. Como mucho **cada 2 días**. Cuántas veces: no lo dijo (FALTA DATO).
+- **Horario del bot (R2: 7).** Fran propone de **8 a 22**. `[TOMÁS: el 29/10 decidiste 24 horas; decidí cuál manda.]`
+- **Zonas de envío.** Neuquén y alrededores: Cipolletti, Plottier, Centenario, Cinco Saltos, Barda del Medio, Fernández Oro, Roca y Cervantes. A veces Plaza Huincul y Cutral Có, si lo pueden llevar ellos (no en camión): eso lo decide una persona (escalás). El costo del envío sigue sin tabla: se escala.
+- **Variedades.** Todo lo que venden está en la planilla. Nombres, medidas y colores, después del conteo de stock.
+- **El Excel.** Lo va a mandar: hoja "listado" con todas las piedras, y "gastos octubre" con todos los gastos y deudas al día (las hojas de gastos se copian de un mes al otro porque arrastran deudas).
+- **Excluidos.** Son 2 o 3; manda la lista.
+- **Fotos de las piedras (simulador).** Más adelante, con buena luz. No es urgente.
+- **Cuentas.** Las pasa después. El bot nunca pasa alias ni CBU (ya era regla).
+
 # Lo que falta (índice)
 
-Fran, ronda 2 (`preguntas-fran-ronda2.md`):
-1. IVA con tarjeta (¿se suma sobre el de lista?). (La 2, el dólar, la contestó el 23/10: promedio de compra y venta del blue.)
-3. y 4. Logo y datos del PDF: encabezado, validez, aclaraciones fijas.
-5. Tramos exactos de la granza y si el bolsón rinde 20 o 25 m².
-6. Seguimiento: cuándo y cuántas veces.
-7. (Ya no hace falta: el bot contesta las 24 horas, decisión de Tomás del 29/10.)
-8. Planes de cuotas y recargos.
+Fran, lo que sigue faltando después de la ronda 2 (30/10):
+- tramo de 10 bolsas o más con tarjeta, y si el bolsón rinde 20 o 25 m²;
+- cuántas veces se hace el seguimiento;
+- datos fiscales y logo del PDF (después del cambio de titular) y el presupuesto actual de muestra;
+- planes de cuotas (después del cambio de titular);
+- el Excel, la lista de excluidos, las fotos de las piedras y las cuentas.
 
-Fran, sin ronda: variedades de piedra que faltan; zonas de envío; contactos excluidos; fotos de cada piedra (`guia-fotos-piedra.md`); el Excel.
+Tomás, decisiones que chocan con lo que dijo Fran:
+- IVA con tarjeta: ¿se suma también sobre el precio de lista (Fran) o la lista ya lo incluye (tu decisión del 16/10)?
+- Horario del bot: ¿8 a 22 (Fran) o 24 horas (tu decisión del 29/10)?
 
 Tomás:
 - El grupo interno de avisos: se crea el 28/10; falta cargar `GRUPO_AVISOS_JID`.
