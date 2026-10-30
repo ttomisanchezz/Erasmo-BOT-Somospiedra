@@ -36,11 +36,15 @@ function apagadaPara(numero) {
   return !String(numero || '').endsWith('@g.us') && !interruptor.prendida();
 }
 const APAGADA = { bloqueado: true, motivo: 'bot apagado (#apagar)' };
+// Última traba (29/10/2026): index.js ya no arma tandas para un contacto personal o excluido, pero lo que se
+// escapa (el "escribiendo…" del mensaje siguiente cuando lo excluyen mientras sale uno) se frena acá.
+const CONTACTO = { bloqueado: true, motivo: 'contacto personal o excluido' };
 
 /** Manda un texto. `delay` hace que WhatsApp muestre "escribiendo…". */
 async function enviarTexto(numero, texto, delayMs = 1200) {
   if (!esDestinoDePrueba(numero)) return { bloqueado: true, motivo: 'fuera de la lista de prueba' };
   if (apagadaPara(numero)) return APAGADA;
+  if (esContactoPersonal(numero)) return CONTACTO;
   return pedir(`/message/sendText/${config.evolution.instancia}`, {
     number: numero,
     text: texto,
@@ -68,18 +72,40 @@ const EXTENSIONES_DOCUMENTO = ['.pdf'];
  * del catálogo y nunca de un texto.
  */
 function archivoPermitido(ruta, carpeta, extensiones) {
+  const real = rutaAdentro(ruta, carpeta);
+  if (!real) return false;
   try {
-    const raiz = fs.realpathSync.native(path.resolve(carpeta));
-    const real = fs.realpathSync.native(path.resolve(String(ruta)));
-    const relativa = path.relative(raiz, real);
-    const adentro = relativa !== '' && !path.isAbsolute(relativa) && relativa.split(path.sep)[0] !== '..';
-    return adentro && extensiones.includes(path.extname(real).toLowerCase()) && fs.statSync(real).isFile();
+    return extensiones.includes(path.extname(real).toLowerCase()) && fs.statSync(real).isFile();
   } catch {
     return false; // no existe o no se puede resolver: no se manda
   }
 }
 
-function fueraDelCatalogo(tipo, ruta) {
+/**
+ * La ruta REAL de `ruta` si está adentro de `carpeta`, o null (no existe, es la carpeta misma, o sale con un
+ * `..` o un enlace). Compara las dos rutas ya resueltas: `..`, enlaces, mayúsculas (exactas, las del disco) y separadores.
+ * Es la resolución de `archivoPermitido`, compartida desde el 29/10/2026 con src/generados.js (los archivos
+ * que genera el bot): una sola, para que los dos candados no se despeguen.
+ */
+function rutaAdentro(ruta, carpeta) {
+  try {
+    const raiz = fs.realpathSync.native(path.resolve(carpeta));
+    const real = fs.realpathSync.native(path.resolve(String(ruta)));
+    // Prefijo EXACTO, no path.relative (29/10/2026): en Windows relative() no distingue mayúsculas y dejaría
+    // "adentro" a un hermano 'GENERADOS' de 'generados' en una carpeta que sí las distingue (WSL, fsutil
+    // setCaseSensitiveInfo). Las dos rutas ya vienen resueltas con las mayúsculas del disco.
+    const adentro = real !== raiz && real.startsWith(raiz.endsWith(path.sep) ? raiz : raiz + path.sep);
+    return adentro ? real : null;
+  } catch {
+    return null; // no existe o no se puede resolver: no se manda
+  }
+}
+
+function fueraDelCatalogo(tipo, ruta, motivo) {
+  if (motivo !== undefined) {
+    console.error(`[envio] ${tipo}: ${motivo}, no lo mando: ${String(ruta).slice(0, 120)}`);
+    return { bloqueado: true, motivo };
+  }
   console.error(`[envio] ${tipo} fuera del catálogo o con extensión no permitida, no lo mando: ${String(ruta).slice(0, 120)}`);
   return { bloqueado: true, motivo: 'archivo fuera del catálogo' };
 }
@@ -88,6 +114,7 @@ function fueraDelCatalogo(tipo, ruta) {
 async function enviarImagen(numero, rutaLocal, caption = '', delayMs = 1200) {
   if (!esDestinoDePrueba(numero)) return { bloqueado: true, motivo: 'fuera de la lista de prueba' };
   if (apagadaPara(numero)) return APAGADA;
+  if (esContactoPersonal(numero)) return CONTACTO;
   if (config.modoEscucha) return { bloqueado: true, motivo: 'modo escucha' };
   if (!archivoPermitido(rutaLocal, fotos.carpeta(), EXTENSIONES_FOTO)) return fueraDelCatalogo('foto', rutaLocal);
   const ext = path.extname(rutaLocal).toLowerCase();
@@ -107,6 +134,7 @@ async function enviarImagen(numero, rutaLocal, caption = '', delayMs = 1200) {
 async function enviarDocumento(numero, rutaLocal, caption = '', delayMs = 1200) {
   if (!esDestinoDePrueba(numero)) return { bloqueado: true, motivo: 'fuera de la lista de prueba' };
   if (apagadaPara(numero)) return APAGADA;
+  if (esContactoPersonal(numero)) return CONTACTO;
   if (config.modoEscucha) return { bloqueado: true, motivo: 'modo escucha' };
   if (!archivoPermitido(rutaLocal, documentos.CARPETA, EXTENSIONES_DOCUMENTO)) {
     return fueraDelCatalogo('documento', rutaLocal);
@@ -121,6 +149,67 @@ async function enviarDocumento(numero, rutaLocal, caption = '', delayMs = 1200) 
     fileName: path.basename(rutaLocal),
     delay: delayMs,
   });
+}
+
+/**
+ * Manda un archivo que generó el propio bot (la imagen del simulador, el presupuesto en PDF; 29/10/2026,
+ * spec del simulador §8). Es la única excepción al candado del catálogo y no lo afloja. En orden:
+ *  1. modo escucha o #apagar: no sale nada;
+ *  2. contacto personal o excluido: no sale nada, ni un borrador al grupo;
+ *  3. `generados.revisar` (las comprobaciones baratas: chat de una persona, tipo, carpeta, extensión del tipo,
+ *     un solo nombre, hasta 5 MB): si falla, no sale nada, ni al grupo (`fueraDelCatalogo` con el motivo);
+ *  4. `generados.leer`: abre el archivo UNA vez, calcula el sha256 de ESOS bytes y exige que esté registrado para
+ *     ESTE chat (el JID exacto) hace menos de 24 h. Los bytes que se verifican son los que se mandan: el dueño
+ *     va atado al CONTENIDO, no a la ruta, así que renombrar, mover, copiar o enlazar el archivo de A no se lo
+ *     da a B, y no hay carrera entre revisar y leer. Contrato completo en la cabecera de src/generados.js
+ *     (los mismos bytes nunca van a dos chats; los hashes se guardan 7 días; los archivos no se borran);
+ *  5. borrador: al cliente nada; el archivo va al grupo marcado BORRADOR, como el borrador de los textos,
+ *     con el mismo candado que `avisarGrupo`;
+ *  6. la lista de prueba, como `enviarImagen`.
+ * `tipo`: 'imagen' o 'pdf'. Nada de esto lo llama Sonnet todavía (no hay herramienta): la ruta nunca sale de un texto.
+ */
+async function enviarGenerado(chatId, ruta, { tipo, caption = '', delayMs = 0 } = {}) {
+  const generados = require('./generados');
+  if (config.modoEscucha) return { bloqueado: true, motivo: 'modo escucha' };
+  if (apagadaPara(chatId)) return APAGADA;
+  if (esContactoPersonal(chatId)) return CONTACTO;
+  const nombre = tipo === 'imagen' ? 'imagen generada' : tipo === 'pdf' ? 'pdf generado' : 'archivo generado';
+  const revision = generados.revisar(chatId, ruta, tipo);
+  if (!revision.ok) return fueraDelCatalogo(nombre, ruta, revision.motivo);
+  const lectura = generados.leer(chatId, revision);
+  if (!lectura.ok) return fueraDelCatalogo(nombre, ruta, lectura.motivo);
+  const { real, ext } = revision;
+  const media = lectura.buffer.toString('base64');
+  const cuerpo = (numero, texto) => ({
+    number: numero,
+    mediatype: tipo === 'imagen' ? 'image' : 'document',
+    mimetype: tipo === 'imagen' ? MIME[ext] : 'application/pdf',
+    media,
+    caption: texto,
+    fileName: path.basename(real),
+    delay: delayMs,
+  });
+  if (config.modoBorrador) {
+    const resultado = { bloqueado: true, motivo: 'modo borrador', alGrupo: false };
+    const motivo = motivoBloqueoAvisos() ||
+      (destinoEsUnCliente(config.grupoAvisos) ? 'el destino es un chat de cliente' : '');
+    if (motivo) {
+      console.log('[aviso bloqueado] ' + motivo);
+      noSalio(motivo);
+      return resultado;
+    }
+    try {
+      const texto = `Chat: https://wa.me/${chatId.split('@')[0]}\n\n— BORRADOR, no se envió —\n${caption}`;
+      await pedir(`/message/sendMedia/${config.evolution.instancia}`, cuerpo(config.grupoAvisos, texto));
+      return { ...resultado, alGrupo: true };
+    } catch (e) {
+      console.error('[evolution] no pude mandar el generado al grupo:', e.message);
+      noSalio(`fallo de envio (${errorCorto(e)})`);
+      return resultado;
+    }
+  }
+  if (!esDestinoDePrueba(chatId)) return { bloqueado: true, motivo: 'fuera de la lista de prueba' };
+  return pedir(`/message/sendMedia/${config.evolution.instancia}`, cuerpo(chatId, caption));
 }
 
 /**
@@ -494,6 +583,7 @@ let escribiendoFallando = false;
 async function mostrarEscribiendo(numero, ms) {
   if (!esDestinoDePrueba(numero)) return { bloqueado: true, motivo: 'fuera de la lista de prueba' };
   if (apagadaPara(numero)) return APAGADA;
+  if (esContactoPersonal(numero)) return CONTACTO;
   try {
     const r = await pedir(`/chat/sendPresence/${config.evolution.instancia}`, {
       number: numero,
@@ -512,7 +602,7 @@ async function mostrarEscribiendo(numero, ms) {
 }
 
 /**
- * ¿Es un contacto personal? (CONTACTOS_PERSONALES)
+ * ¿Es un contacto personal? (CONTACTOS_PERSONALES, o excluido con #excluir)
  *
  * Un chat así se ignora ENTERO y lo más temprano posible: no se procesa, no se
  * guarda en estado.json, no va a Gemini, no se le transcriben los audios, no
@@ -522,9 +612,21 @@ async function mostrarEscribiendo(numero, ms) {
  * El grupo de avisos nunca cuenta como personal, pase lo que pase.
  */
 function esContactoPersonal(jid) {
-  if (!jid) return false;
-  if (jid === config.grupoAvisos) return false;
-  return estaEnLaLista(jid, config.contactosPersonales);
+  return motivoContactoPersonal(jid) !== null;
+}
+
+/**
+ * Por qué se ignora entero este chat: 'CONTACTOS_PERSONALES' (la lista del .env), 'excluido' (#excluir, la
+ * lista del estado: src/excluidos.js, 29/10/2026) o null. Las dos comparan como todas las listas de números
+ * (`estaEnLaLista`). Sirve para decirlo bien en el grupo: lo del .env no se saca por comando.
+ */
+function motivoContactoPersonal(jid) {
+  if (!jid) return null;
+  if (jid === config.grupoAvisos) return null;
+  if (estaEnLaLista(jid, config.contactosPersonales)) return 'CONTACTOS_PERSONALES';
+  // state se pide acá adentro, como más arriba, para no cargarlo al requerir esto.
+  if (estaEnLaLista(jid, require('./state').numerosExcluidos())) return 'excluido';
+  return null;
 }
 
 function motivoBloqueoAvisos() {
@@ -536,6 +638,8 @@ function motivoBloqueoAvisos() {
 }
 
 module.exports = {
+  rutaAdentro,
+  enviarGenerado,
   enviarTexto,
   enviarImagen,
   enviarDocumento,
@@ -552,6 +656,7 @@ module.exports = {
   esDestinoDePrueba,
   leLlegaAlCliente,
   esContactoPersonal,
+  motivoContactoPersonal,
   estaEnLaLista,
   base64DeMedia,
   RE_GRUPO,

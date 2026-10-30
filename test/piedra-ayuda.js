@@ -51,6 +51,7 @@ function preparar(entorno = {}) {
     HOST: '',
     FOTOS_DIR: path.join(TMP, 'fotos'),
     DOCS_DIR: path.join(TMP, 'documentos'),
+    GENERADOS_DIR: path.join(TMP, 'generados'),
     EVOLUTION_INSTANCE: 'somospiedra',
     EVOLUTION_APIKEY: 'clave-de-mentira',
     ESTADO_PATH: path.join(TMP, 'estado.json'),

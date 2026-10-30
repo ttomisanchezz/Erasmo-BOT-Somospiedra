@@ -233,6 +233,118 @@ async function conLista(lista, fn) {
     });
   });
 
+  console.log('\nExcluidos por comando (#excluir): la lista del estado cuenta igual que CONTACTOS_PERSONALES\n');
+
+  // Números inventados. La lista vive en estado.json, bajo la clave interna (src/excluidos.js la llena).
+  const EXCLUIDO = '5490000000801@s.whatsapp.net';
+  const excluir = (numero) => state.guardarExcluido(numero, { desde: Date.now(), nombre: null, origen: 'grupo' });
+
+  await check('un número excluido en el estado es contacto personal, con o sin el 9, y deja de serlo al sacarlo', () => {
+    assert.strictEqual(evolution.esContactoPersonal(EXCLUIDO), false);
+    excluir('5490000000801');
+    try {
+      assert.strictEqual(evolution.esContactoPersonal(EXCLUIDO), true);
+      assert.strictEqual(evolution.esContactoPersonal('540000000801@s.whatsapp.net'), true);
+      assert.strictEqual(evolution.motivoContactoPersonal(EXCLUIDO), 'excluido');
+    } finally {
+      state.borrarExcluido('5490000000801');
+    }
+    assert.strictEqual(evolution.esContactoPersonal(EXCLUIDO), false);
+    assert.strictEqual(evolution.motivoContactoPersonal(EXCLUIDO), null);
+  });
+
+  await check('el motivo dice de dónde viene: CONTACTOS_PERSONALES (el .env) antes que el excluido', async () => {
+    excluir('5490000000802');
+    try {
+      await conLista(['5490000000802'], async () => {
+        assert.strictEqual(evolution.motivoContactoPersonal('5490000000802@s.whatsapp.net'), 'CONTACTOS_PERSONALES');
+      });
+      assert.strictEqual(evolution.motivoContactoPersonal('5490000000802@s.whatsapp.net'), 'excluido');
+    } finally {
+      state.borrarExcluido('5490000000802');
+    }
+  });
+
+  await check('el grupo de avisos nunca cuenta, aunque su número esté en la lista de excluidos', () => {
+    const antes = config.grupoAvisos;
+    config.grupoAvisos = '120363000000000000@g.us';
+    excluir('120363000000000000');
+    try {
+      assert.strictEqual(evolution.esContactoPersonal(config.grupoAvisos), false);
+      assert.strictEqual(evolution.motivoContactoPersonal(config.grupoAvisos), null);
+    } finally {
+      config.grupoAvisos = antes;
+      state.borrarExcluido('120363000000000000');
+    }
+  });
+
+  await check('la lista vive bajo la clave interna: no crea el chat, queda en estado.json y se borra de ahí', () => {
+    const enDisco = () => JSON.parse(fs.readFileSync(process.env.ESTADO_PATH, 'utf8'))['bot:interno'] || {};
+    excluir('5490000000803');
+    try {
+      assert.ok(!state.todos()['5490000000803@s.whatsapp.net'], 'le creó un chat al excluirlo');
+      assert.ok(state.numerosExcluidos().includes('5490000000803'));
+      assert.ok((enDisco().excluidos || {})['5490000000803'], 'no quedó en disco al instante');
+    } finally {
+      state.borrarExcluido('5490000000803');
+    }
+    assert.ok(!state.numerosExcluidos().includes('5490000000803'));
+    assert.ok(!(enDisco().excluidos || {})['5490000000803'], 'sigue en disco después de sacarlo');
+  });
+
+  await check('una lista de excluidos dañada (estado.json tocado a mano) se lee vacía sin pisarla; recién #excluir la rehace', () => {
+    // En otro proceso, como el bot: state.js lee el archivo al cargarse. El cwd es la carpeta temporal, así
+    // dotenv no encuentra ningún .env.
+    const { execFileSync } = require('child_process');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'excluidos-danados-'));
+    const STATE_JS = path.join(__dirname, '..', 'src', 'state.js');
+    try {
+      for (const danado of [['5490000000806'], null, '5490000000806', 5]) {
+        const archivo = path.join(dir, 'estado.json');
+        fs.writeFileSync(archivo, JSON.stringify({ 'bot:interno': { esquema: 3, excluidos: danado } }));
+        const salida = execFileSync(
+          process.execPath,
+          [
+            '-e',
+            `console.log = () => {}; console.error = () => {}; const s = require(${JSON.stringify(STATE_JS)});` +
+              `process.stdout.write(JSON.stringify({ numeros: s.numerosExcluidos(), leer: s.leerExcluidos() }));`,
+          ],
+          { cwd: dir, env: { ...process.env, ESTADO_PATH: archivo }, encoding: 'utf8' }
+        );
+        assert.deepStrictEqual(JSON.parse(salida), { numeros: [], leer: {} });
+        const enDisco = JSON.parse(fs.readFileSync(archivo, 'utf8'))['bot:interno'].excluidos;
+        assert.deepStrictEqual(enDisco, danado, 'leer la lista la arregló y la pisó en disco');
+        // Recién un #excluir (guardarExcluido) la rehace como objeto.
+        execFileSync(
+          process.execPath,
+          [
+            '-e',
+            `console.log = () => {}; console.error = () => {}; const s = require(${JSON.stringify(STATE_JS)});` +
+              `s.guardarExcluido('5490000000807', { desde: 1, nombre: null, origen: 'grupo' });`,
+          ],
+          { cwd: dir, env: { ...process.env, ESTADO_PATH: archivo }, encoding: 'utf8' }
+        );
+        assert.deepStrictEqual(Object.keys(JSON.parse(fs.readFileSync(archivo, 'utf8'))['bot:interno'].excluidos), ['5490000000807']);
+      }
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  await check('un excluido por comando se ignora entero: ni estado, ni Sonnet, ni respuesta', async () => {
+    excluir('5490000000804');
+    try {
+      limpiar();
+      await bot.procesar(escrito('5490000000804@s.whatsapp.net', 'hola tienen laja?'));
+      await dormir(200);
+      assert.strictEqual(aClientes.length, 0, 'le contestó a un excluido');
+      assert.strictEqual(sonnetFijo.llamadas.length, 0, 'gastó una llamada a Sonnet');
+      assert.ok(!state.todos()['5490000000804@s.whatsapp.net'], 'guardó el chat de un excluido');
+    } finally {
+      state.borrarExcluido('5490000000804');
+    }
+  });
+
   console.log('\nLos que NO están en la lista siguen como siempre\n');
 
   await check('un cliente normal recibe respuesta', async () => {

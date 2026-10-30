@@ -181,7 +181,11 @@ function elegirChatDesdeGrupo({ comando: nombre, numero, nada, verbo, comoSeUsa 
   if (numero.length < DIGITOS_MINIMOS) {
     return sinTocar(`❓ ${nombre} ${numero}: no parece un número de teléfono. ${nada}\n\n${comoSeUsa}`);
   }
-  if (evolution.esContactoPersonal(`${numero}@s.whatsapp.net`)) {
+  const personal = evolution.motivoContactoPersonal(`${numero}@s.whatsapp.net`);
+  if (personal === 'excluido') {
+    return sinTocar(`❓ El ${numero} está excluido con #excluir y el bot lo ignora. ${nada}\nPara volver a atenderlo: #incluir ${numero}`);
+  }
+  if (personal) {
     return sinTocar(`❓ El ${numero} está en CONTACTOS_PERSONALES. ${nada}`);
   }
   const chats = chatsDelNumero(numero);

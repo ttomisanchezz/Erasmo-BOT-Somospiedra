@@ -53,6 +53,10 @@ Encima van los modos de salida de siempre: `MODO_ESCUCHA` (no sale nada, ni al g
 cargada, solo a esos; `NUMEROS_PILOTO=todos`: a todos) y `SOLO_CHATS_NUEVOS`. La única definición de "le
 llega al cliente" es `evolution.leLlegaAlCliente`.
 
+**Horario: el bot contesta las 24 horas** (decisión de Tomás, 29/10/2026): no hay franja horaria para los
+clientes. `SEGUIMIENTO_HORA_DESDE` / `_HASTA` solo rigen al guardián (cuándo mira que lleguen mensajes) y a los
+recordatorios internos del grupo.
+
 **Si Sonnet falla** (error de la API, timeout, sin `ANTHROPIC_API_KEY`) **no hay respaldo**: se escala en
 silencio ("Sonnet no pudo contestar (…)" en el 🔕 del grupo), sin callar el chat (el próximo mensaje se
 vuelve a intentar). Lo prueba `test/piedra-sonnet.test.js`.
@@ -87,6 +91,54 @@ vuelve a intentar). Lo prueba `test/piedra-sonnet.test.js`.
   `test/catalogo-piedra.test.js`.
 - Todavía **no están conectados al cerebro**: eso es el prompt 4 (`buscar_productos`, `cotizar`).
 
+## Archivos que genera el bot (`src/generados.js`, 29/10/2026)
+
+- Para la imagen del simulador y el presupuesto en PDF (`bot/spec-simulador-v1.md` §8). Van en
+  `data/generados/` (`GENERADOS_DIR`).
+- **Contrato del generador:** escribe un archivo NUEVO y lo registra enseguida para UN chat,
+  `generados.registrar(chatId, ruta)`. Para registrarse tiene que ser el chat de una persona (`…@s.whatsapp.net`),
+  estar adentro de la carpeta, ser `.jpg`/`.jpeg`/`.png`/`.webp`/`.pdf` de hasta 5 MB, con un solo nombre (sin hard
+  link ni flujo `:` de NTFS) y con fecha de los últimos 10 minutos.
+- El registro (en `estado.json`: sobrevive reinicios) guarda el **sha256 del contenido**: el dueño va atado a los
+  bytes, no a la ruta. Renombrar, mover, copiar o volver a usar un nombre no le da a otro chat el archivo de A, y
+  los mismos bytes nunca se registran para dos chats (un archivo para todos va por el catálogo). Los hashes se
+  guardan 7 días.
+- `evolution.enviarGenerado(chatId, ruta, { tipo: 'imagen' | 'pdf', caption })`, en orden: escucha / `#apagar` /
+  contacto personal o excluido → nada; revisa la ruta (la misma resolución que el candado del catálogo) y lee
+  el archivo UNA vez: esos bytes tienen que estar registrados para ESE chat hace menos de 24 h; borrador → al
+  cliente nada y el archivo va al grupo marcado BORRADOR; fuera de las listas de prueba → nada. Si algo falla
+  no sale nada (`{ bloqueado: true, motivo }`).
+- **Nada de esto se expone a Sonnet todavía** (no hay herramienta: la ruta nunca sale de un texto). Los
+  archivos no se borran: la limpieza espera la decisión de Tomás (spec §12.4). Riesgo aceptado (escrito en
+  `generados.js`): cambiarle la fecha a mano a un archivo de más de 7 días, o un generador que escriba el
+  contenido de A con otros bytes para B. Test: `test/generados.test.js`.
+
+## Excluidos: `#excluir` / `#incluir` (decisión de Tomás, 29/10/2026)
+
+- Números que el bot ignora enteros, como `CONTACTOS_PERSONALES`, pero que se dan de alta y de baja desde
+  WhatsApp sin tocar el `.env` ni reiniciar (lo pidió Fran: `reglas/cerebro-reglas-piedra.md`, "Contactos
+  excluidos"). Viven en `estado.json` (clave interna: sobreviven reinicios, quedan en el respaldo por hora y
+  `#reset` no los toca). Se puede excluir un número que nunca escribió (un proveedor). `src/excluidos.js`.
+- `evolution.esContactoPersonal` mira las dos listas (`motivoContactoPersonal` dice cuál), así que todo lo que
+  ya lo usaba (index, control, recordatorios, ventas) los respeta. El grupo de avisos nunca cuenta. Además,
+  `enviarTexto`, `mostrarEscribiendo`, `enviarImagen`, `enviarDocumento` y `enviarGenerado` no le mandan nada a
+  un contacto personal o excluido (última traba: ni el "escribiendo…").
+- `#excluir` corta también la tanda que estaba esperando, transcribiendo un audio, pensando o mandando (ni
+  Sonnet, ni la sombra, ni avisos), salvo que se vuelva a `#incluir` en esos mismos segundos: ahí la respuesta
+  en vuelo sale (borde aceptado; revisión de Codex del 29/10, P2). `#incluir` escrito en el chat de un excluido
+  se atiende antes del corte de los personales. Lo del `.env` no se saca por comando.
+- **El número tipeado en el grupo** se lleva a `549` + 10 dígitos (sin 54, 9 ni 0 de adelante; sin 15) y si no
+  da, ❓ sin marcar nada: un número mal escrito no excluye a otro por sufijo. Si ningún chat guardado coincide,
+  el 🚫 dice "verificá el link". Un número **extranjero** se excluye solo desde su chat (o por el `.env`); se
+  vuelve a incluir desde su chat o con `#incluir` y los dígitos exactos guardados.
+- En el chat de un excluido, `#vendido`, `#recordar`, `#pausa`, `#reset`… no hacen nada: avisan con un ❓ en el
+  grupo (decisión pendiente de Tomás: si tienen que valer igual). Un `#recordar` de antes no suena mientras esté
+  excluido (el 🚫 lo avisa).
+- Al `#incluir`, lo que el cliente dejó escrito antes no lo contesta el barrido del silencio (`silencioAtendido`).
+  Límite conocido: lo que se habló mientras estaba excluido no entra al historial (ni lo trae `contexto.js`),
+  así que después del `#incluir` Sonnet no lo ve.
+- Tests: `test/excluidos.test.js` (cada freno con su caso, verificados con mutaciones) y `test/personales.test.js`.
+
 ## Protecciones que hay que conservar (resumen; detalle en `_heredado-iphone/CLAUDE-iphone.md`, "Protecciones que no hay que sacar")
 
 - Ritmo humano: espera de 20-45 s antes de interpretar; lo que llega en ese rato se junta en la misma
@@ -98,11 +150,13 @@ vuelve a intentar). Lo prueba `test/piedra-sonnet.test.js`.
   lo que quedó (vía Sonnet).
 - Escalado callado (`src/control.js`): el chat queda callado hasta que alguien lo tome; un solo ⏰ al grupo
   si el cliente escribió después; pasadas 24 h es consulta nueva. Datos viejos (72 h): consulta nueva.
-- Chat sin número (`@lid`): no se procesa; 📵 al grupo sin el texto. `CONTACTOS_PERSONALES`: se ignoran enteros.
+- Chat sin número (`@lid`): no se procesa; 📵 al grupo sin el texto. `CONTACTOS_PERSONALES` y los excluidos
+  por comando (`#excluir`): se ignoran enteros.
 - El webhook no le cree a cualquiera: secreto en la ruta (`WEBHOOK_SECRETO`, 401), tope por minuto (429),
   cuerpo validado (400), instancia de otra (403, también `somosiphone`). Nunca se loguea el cuerpo.
-- Un mensaje repetido (mismo id) no se procesa dos veces. Un texto nunca manda un archivo (y el bot de
-  Piedra no manda archivos: `evolution.js` igual tiene el candado de carpeta y extensión).
+- Un mensaje repetido (mismo id) no se procesa dos veces. Un texto nunca manda un archivo. El bot de Piedra
+  no manda archivos del catálogo (`evolution.js` igual tiene el candado de carpeta y extensión); los que
+  genera él mismo salen solo por `enviarGenerado`, con su propio candado (ver arriba).
 - Audios: se transcriben con Gemini (solo para eso, con modelo de respaldo); uno que no se entiende **no se
   contesta**: escala en silencio. Lo que cita el cliente llega como `[responde a: …]`.
 - Guardián de Evolution (`src/guardian.js`): avisa al grupo si la instancia no está `open` o no llegan mensajes.
@@ -113,14 +167,17 @@ vuelve a intentar). Lo prueba `test/piedra-sonnet.test.js`.
 ## Comandos
 
 **En WhatsApp, desde la cuenta del negocio** (en el chat del cliente): `#pausa`, `#sigue` (reactiva y
-contesta lo que dejó escrito), `#reset`, `#recordar <qué>` / `#hecho`, `#vendido` / `#perdido`.
+contesta lo que dejó escrito), `#reset`, `#recordar <qué>` / `#hecho`, `#vendido` / `#perdido`,
+`#excluir` / `#incluir` (el bot lo ignora entero / lo vuelve a atender).
 **En el grupo interno**, con el número: `#pausa <n>`, `#sigue <n>`, `#vendido <n>`, `#perdido <n>`,
 `#sonnet <n>` (qué contestaría, sin mandar nada), `#comparar <n>`, `#bot <n>` (sin Sonnet: queda en
-sombra), `#sonnet-si <n>`; sin número: `#apagar` / `#prender` (interruptor general, local). **Desde el
-celular del tester**: `#reset`.
+sombra), `#sonnet-si <n>`, `#excluir <n>` / `#incluir <n>` (sirve pegar un wa.me; se puede excluir un número
+que nunca escribió); sin número: `#excluidos` (la lista), `#apagar` / `#prender` (interruptor general,
+local). **Desde el celular del tester**: `#reset`. Cada comando contesta en el grupo cómo se usa si se
+escribe mal (no hay un `#ayuda` central: cada módulo tiene su `COMO_SE_USA`).
 
 **npm**: `npm start`; `npm test` (la suite: ver `package.json`; si tarda, archivo por archivo con
-`node test/<archivo>.test.js`); `npm run evaluar -- --offline` (8 casos de Piedra con Sonnet enlatado: tiene
+`node test/<archivo>.test.js`); `npm run evaluar -- --offline` (10 casos de Piedra con Sonnet enlatado: tiene
 que dar 100%); `npm run aprender`; `npm run destino` (a dónde van los avisos); `npm run sembrar-viejos`
 (semilla de chats viejos, con el bot frenado); `npm run probar-contexto -- 549…`.
 
@@ -130,7 +187,8 @@ Todas en `src/config.js`; `.env.example` va siempre con los valores vacíos. No 
 El bot **no necesita** `credenciales.json` ni variables de Supabase o de la planilla para arrancar (ya no
 existen). Las importantes: `EVOLUTION_INSTANCE` (obligatoria), `EVOLUTION_APIKEY`, `PORT` (3002),
 `WEBHOOK_SECRETO`, `GRUPO_AVISOS_JID`, `CEREBRO_MODO`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` (solo
-audios), `MODO_ESCUCHA`, `MODO_BORRADOR`, `NUMEROS_TESTER`, `NUMEROS_PILOTO`, `CONTACTOS_PERSONALES`.
+audios), `MODO_ESCUCHA`, `MODO_BORRADOR`, `NUMEROS_TESTER`, `NUMEROS_PILOTO`, `CONTACTOS_PERSONALES`,
+`GENERADOS_DIR` (vacía: `data/generados`).
 
 ## Tests
 
@@ -139,20 +197,22 @@ audios), `MODO_ESCUCHA`, `MODO_BORRADOR`, `NUMEROS_TESTER`, `NUMEROS_PILOTO`, `C
   para los de infraestructura). Nunca salen a la red; números inventados (`5490000…`).
 - `test/piedra-*.test.js`: modos, guardia, escalar, Sonnet que falla, tandas, audio, lid, personales,
   control humano, escucha/borrador/listas, webhook. Más los adaptados de iPhone: dedupe, persistencia,
-  lid, personales, chats-viejos, guardian, recordatorios, ventas, sombra-persona, contexto, gemini.
+  lid, personales, chats-viejos, guardian, recordatorios, ventas, sombra-persona, contexto, gemini. Y los
+  del 29/10: `excluidos` (`#excluir` / `#incluir` / `#excluidos`) y `generados` (`enviarGenerado`, sin
+  cargar index.js).
 - Primero el test que falla, después el arreglo. Sin llamadas reales a Anthropic, Gemini, Evolution.
 
 ## Mapa de carpetas
 
 | Carpeta | Qué hay |
 |---|---|
-| `src/` | El bot: `index.js` (webhook, tandas, comandos, barridos), `cerebro.js` + `cerebro-reglas.md`, `config.js`, `state.js`, `evolution.js`, `control.js`, `contexto.js`, `audio.js` + `gemini.js`, `guardian.js`, `chats-viejos.js`, `autoria.js`, `aprendizaje.js`, `sombra-persona.js`, `cerebro-comandos.js`, `interruptor.js`, `promesas.js`, `recordatorios.js`, `ventas.js`, `salida.js`, `avisos-texto.js`, y los de Piedra `cotizador-piedra.js` y `catalogo-piedra.js`. |
+| `src/` | El bot: `index.js` (webhook, tandas, comandos, barridos), `cerebro.js` + `cerebro-reglas.md`, `config.js`, `state.js`, `evolution.js`, `control.js`, `contexto.js`, `audio.js` + `gemini.js`, `guardian.js`, `chats-viejos.js`, `autoria.js`, `aprendizaje.js`, `sombra-persona.js`, `cerebro-comandos.js`, `interruptor.js`, `promesas.js`, `recordatorios.js`, `ventas.js`, `excluidos.js`, `generados.js`, `salida.js`, `avisos-texto.js`, y los de Piedra `cotizador-piedra.js` y `catalogo-piedra.js`. |
 | `test/` | Los tests y los scripts (`evaluar.js`, `aprender.js`, `destino.js`, `sembrar-viejos.js`, `probar-contexto.js`). |
 | `reglas/` | Reglas y casos de Piedra en borrador (Etapa 2). |
 | `herramientas/historial/` | Exportador y clasificador del historial de Evolution (Etapa 1). |
 | `bot/` | Prompts para VS Code y `mapa-poda.md` (qué se conservó, adaptó y movió en la poda). |
 | `claude/` | Traspasos de cada chat (el de fecha más nueva manda). |
-| `data/` | Estado, registro de aprendizaje, precios (no se versiona). |
+| `data/` | Estado, registro de aprendizaje, precios y los archivos que genera el bot (`data/generados/`) (no se versiona). |
 | `_heredado-iphone/` | **Lo de iPhone, movido (no borrado)** el 19/10/2026: `src/` (responder, cotizador, sheets, techsur, espejo, stock-app, bateria, fotos-equipos, promo-madre, extractor-local, panel-chiara, supabase-reintento, anuncio, estilo, temas, resumen, las reglas de iPhone y las versiones de iPhone de `index.js` y `cerebro.js`), `test/` (sus tests y scripts), `CLAUDE-iphone.md` y `README-iphone.md`. **Nada vivo lo requiere**; se lee solo para consultar. |
 
 ## Pendientes de decisión (Tomás)
@@ -160,3 +220,7 @@ audios), `MODO_ESCUCHA`, `MODO_BORRADOR`, `NUMEROS_TESTER`, `NUMEROS_PILOTO`, `C
 - Saludo automático del día (se fue con `responder.js`): hoy no hay; lo decide Tomás.
 - Seguimiento automático y resumen de la mañana: se fueron (eran de iPhone); si se quieren para Piedra, se diseñan de nuevo.
 - Las 5 preguntas de precios del traspaso del 16/10 y las de `preguntas-para-fran-v2.md`.
+- Cuánto se guardan los archivos de `data/generados/` (spec del simulador §12.4): hoy no se borra nada.
+- Conectar `enviarGenerado` al cerebro (`simular_piedra`, `presupuesto_pdf`): fase F2 de la spec del simulador.
+- Si `#vendido` / `#perdido` / `#recordar` / `#pausa` tienen que valer en el chat de un excluido (hoy solo avisan
+  con un ❓ en el grupo y no hacen nada).

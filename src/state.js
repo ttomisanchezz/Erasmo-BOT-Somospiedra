@@ -670,6 +670,75 @@ function borrarRecordatorio(chatId) {
 }
 
 /**
+ * Excluidos por comando (#excluir / #incluir, src/excluidos.js; decisión de Tomás del 29/10/2026): números
+ * que el bot ignora ENTEROS, como los de CONTACTOS_PERSONALES, pero que se dan de alta y de baja desde
+ * WhatsApp, sin tocar el .env ni reiniciar. `{ número: { desde, nombre, origen } }` bajo la clave interna,
+ * como los recordatorios: sobreviven a un reinicio, quedan en el respaldo por hora y #reset no los toca. No
+ * van dentro del chat a propósito: se puede excluir un número que nunca escribió (un proveedor) sin crearle
+ * un chat. Guardan YA: es una decisión de la cuenta y no se puede perder con un corte.
+ */
+function excluidos() {
+  const i = interno();
+  if (!i.excluidos || typeof i.excluidos !== 'object' || Array.isArray(i.excluidos)) {
+    // Solo pasa si alguien tocó estado.json a mano: lo que había no se puede leer y la lista arranca vacía.
+    if (i.excluidos !== undefined) console.error(`[state] la lista de excluidos estaba dañada (${JSON.stringify(i.excluidos).slice(0, 80)}): arranca vacía`);
+    i.excluidos = {};
+  }
+  return i.excluidos;
+}
+
+/**
+ * La lista de excluidos para LEER (#excluidos), sin crear ni arreglar nada: dañada o ausente da {}. Si leer
+ * la arreglara, el próximo guardado pisaría en disco lo que había, sin que nadie lo decidiera.
+ */
+function leerExcluidos() {
+  const e = memoria[CLAVE_BOT] && memoria[CLAVE_BOT].excluidos;
+  return e && typeof e === 'object' && !Array.isArray(e) ? e : {};
+}
+
+function guardarExcluido(numero, datos) {
+  excluidos()[numero] = datos;
+  guardarYa();
+}
+
+function borrarExcluido(numero) {
+  delete excluidos()[numero];
+  guardarYa();
+}
+
+/**
+ * Los números excluidos por comando, sin crear nada: lo mira evolution.esContactoPersonal con cada mensaje
+ * que llega, y un proceso que solo lee no tiene por qué dejar un `excluidos: {}` en el archivo.
+ */
+function numerosExcluidos() {
+  return Object.keys(leerExcluidos());
+}
+
+/**
+ * Archivos que genera el bot (la imagen del simulador, el presupuesto en PDF; src/generados.js): para qué
+ * chat se generó cada uno y cuándo. `{ clave: { chatId, ts } }` bajo la clave interna: sobrevive a un
+ * reinicio y #reset no lo toca. Un archivo sale solo a ese chat y solo por 24 h (evolution.enviarGenerado).
+ * Guarda YA: si el bot se reinicia justo después de generar, el archivo tiene que seguir registrado.
+ */
+function generados() {
+  const i = interno();
+  if (!i.generados || typeof i.generados !== 'object' || Array.isArray(i.generados)) i.generados = {};
+  return i.generados;
+}
+
+function guardarGenerado(clave, datos) {
+  generados()[clave] = datos;
+  guardarYa();
+}
+
+/** Saca del registro las claves que ya no sirven (la poda de generados.js). Los archivos no se tocan. */
+function borrarGenerados(claves) {
+  const g = generados();
+  for (const c of claves) delete g[c];
+  guardarYa();
+}
+
+/**
  * El gasto de Sonnet del mes (bloque Ninjo 2, 06/10/2026): `{ mes: 'AAAA-MM', usd }`, el mes de
  * Argentina. Lo suma cerebro.js con cada llamada a la API (`sumarAlMes`), en el mismo lugar que el
  * gasto del día; /salud lo muestra. Bajo la clave interna: sobrevive a un reinicio y #reset no lo toca.
@@ -781,5 +850,13 @@ module.exports = {
   recordatorios,
   guardarRecordatorio,
   borrarRecordatorio,
+  excluidos,
+  leerExcluidos,
+  guardarExcluido,
+  borrarExcluido,
+  numerosExcluidos,
+  generados,
+  guardarGenerado,
+  borrarGenerados,
   ARCHIVO,
 };

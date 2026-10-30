@@ -1,4 +1,5 @@
 'use strict';
+const path = require('path');
 require('dotenv').config();
 
 /**
@@ -149,6 +150,8 @@ module.exports = {
 
   // La única carpeta de la que evolution.js acepta mandar una imagen (candado; hoy el bot no manda fotos).
   fotosDir: process.env.FOTOS_DIR || './fotos',
+  // Única carpeta que enviarGenerado acepta para archivos propios del bot; data/ no se versiona.
+  generadosDir: process.env.GENERADOS_DIR || path.join(__dirname, '..', 'data', 'generados'),
 
   // La franja de horario de SEGUIMIENTO_HORA_DESDE a _HASTA: el guardián mira si llegan mensajes en
   // ella, y HASTA cierra los recordatorios manuales y el del escalado. El seguimiento automático de

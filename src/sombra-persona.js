@@ -32,6 +32,8 @@ const cerebro = require('./cerebro');
 const contexto = require('./contexto');
 const aprendizaje = require('./aprendizaje');
 const interruptor = require('./interruptor');
+// evolution no carga state al requerirse (lo pide adentro de esContactoPersonal), así que no suma nada al arranque.
+const evolution = require('./evolution');
 
 const DIA_ARGENTINA = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'America/Argentina/Buenos_Aires',
@@ -115,6 +117,8 @@ function anotarYa(chatId, nombre, lineas, motivo, espera) {
 
 async function pensar(chatId, e) {
   if (!activa()) return null;
+  // Un #excluir (o CONTACTOS_PERSONALES) mientras esperaba la sombra: el chat se ignora entero, no se lee ni se piensa.
+  if (evolution.esContactoPersonal(chatId)) return null;
   // Un #reset en el medio: el chat ya no es el mismo (y preguntar lo volvería a crear vacío).
   if (state.generacion(chatId) !== e.generacion || !Object.prototype.hasOwnProperty.call(state.todos(), chatId)) return null;
   const conTexto = e.lineas.filter(({ linea }) => {
@@ -138,6 +142,8 @@ async function pensar(chatId, e) {
   // del estado que toca). Si en el medio hubo un #reset, no piensa.
   const ctx = await contexto.completar(chatId);
   if (state.generacion(chatId) !== e.generacion || !Object.prototype.hasOwnProperty.call(state.todos(), chatId)) return null;
+  // Lo excluyeron mientras se completaba el contexto.
+  if (evolution.esContactoPersonal(chatId)) return null;
   const r = await cerebro.pensar({ chatId, mensaje: texto, nombre: e.nombre, ahora: hasta, hasta });
   g.usd += Number(r.usd) || 0;
   g.pensadas++;

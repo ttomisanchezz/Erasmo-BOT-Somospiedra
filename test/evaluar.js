@@ -25,7 +25,7 @@ let n = 900;
 const nuevo = () => `54900000${String(++n).padStart(5, '0')}`;
 
 /**
- * Los casos: { nombre, pasos: [{ c } | { persona }], sonnet: [pasos de la API], chequeo(ctx) }. `ctx` trae
+ * Los casos: { nombre, pasos: [{ c } | { persona } | { grupo }], sonnet: [pasos de la API], chequeo(ctx) }. `ctx` trae
  * lo que le llegó al cliente (`cliente`, textos), lo que llegó al grupo (`grupo`), cuántos pedidos hubo a
  * Sonnet (`pedidos`) y el estado del chat (`s`). `chequeo` devuelve null si está bien, o el problema.
  */
@@ -79,6 +79,20 @@ const CASOS = [
     sonnet: [sonnet.falla(500), sonnet.falla(500)],
     chequeo: ({ cliente, grupo }) => (cliente.length ? `le llegó ${JSON.stringify(cliente)}` : !grupo.some((t) => /Sonnet no pudo contestar/.test(t)) ? 'no avisó al grupo' : null),
   },
+  {
+    nombre: 'un excluido (#excluir en el grupo) escribe: no pasa nada (sin Sonnet, nada al cliente, nada al grupo salvo la confirmación)',
+    pasos: [{ grupo: '#excluir {num}' }, { c: 'hola, tienen laja?' }],
+    sonnet: [],
+    chequeo: ({ cliente, grupo, pedidos }) =>
+      pedidos ? 'le preguntó a Sonnet' : cliente.length ? `le llegó ${JSON.stringify(cliente)}` : grupo.length !== 1 || !/^🚫 Excluido/.test(grupo[0]) ? `al grupo llegó ${JSON.stringify(grupo)}` : null,
+  },
+  {
+    nombre: '#excluir en el chat: al cliente no le llega nada y el grupo recibe la confirmación con 🚫',
+    pasos: [{ persona: '#excluir' }],
+    sonnet: [],
+    chequeo: ({ cliente, grupo, pedidos }) =>
+      pedidos ? 'le preguntó a Sonnet' : cliente.length ? `le llegó ${JSON.stringify(cliente)}` : !grupo.some((t) => /^🚫 Excluido/.test(t)) ? 'no confirmó con 🚫 en el grupo' : null,
+  },
 ];
 
 /** Las reglas globales: devuelve los problemas de lo que le llegó al cliente en una tanda. */
@@ -104,6 +118,8 @@ function reglasGlobales(cliente) {
       if (paso.persona) {
         await bot.procesar(propio(num, paso.persona));
         await p.dormir(3);
+      } else if (paso.grupo) {
+        await bot.procesar(p.enElGrupo(paso.grupo.replace('{num}', num)));
       } else {
         await bot.procesar(mensaje(num, paso.c));
       }
@@ -114,7 +130,7 @@ function reglasGlobales(cliente) {
     if (!problemas.length) bien++;
     console.log(`  ${problemas.length ? 'FALLA' : 'ok   '} ${caso.nombre}${problemas.length ? ' -> ' + problemas.join('; ') : ''}`);
     if (VERBOSO) {
-      for (const paso of caso.pasos) console.log(`        ${paso.persona ? 'persona' : 'cliente'}: ${paso.persona || paso.c}`);
+      for (const paso of caso.pasos) console.log(`        ${paso.grupo ? 'grupo' : paso.persona ? 'persona' : 'cliente'}: ${paso.grupo || paso.persona || paso.c}`);
       for (const t of cliente) console.log(`        bot: ${t.replace(/\n/g, ' / ')}`);
       for (const t of ctx.grupo) console.log(`        grupo: ${t.split('\n')[0]}`);
     }

@@ -29,6 +29,8 @@ const aprendizaje = require('./aprendizaje');
 const audio = require('./audio');
 const recordatorios = require('./recordatorios');
 const ventas = require('./ventas');
+// Lista de excluidos a mano (#excluir / #incluir / #excluidos): src/excluidos.js.
+const excluidos = require('./excluidos');
 const acciones = require('./acciones');
 const autoria = require('./autoria');
 const control = require('./control');
@@ -334,6 +336,9 @@ async function comandoDelGrupo(data) {
   // #vendido y #perdido con el número del cliente: marcan ese chat.
   const venta = ventas.comando(texto);
   if (venta) await confirmarVenta(ventas.desdeGrupo(venta, data?.key?.id));
+  // #excluir / #incluir con el número, y #excluidos: la lista de contactos que el bot ignora.
+  const exc = excluidos.comando(texto);
+  if (exc) await confirmarExcluidos(excluidos.desdeGrupo(exc));
   // #pausa y #sigue con el número. #sigue contesta lo que dejó escrito el cliente (`alSeguir`): sus líneas
   // quedan en la cola al reactivar y la tanda arranca ya (lo primero que hace es la espera de siempre, así
   // el aviso sale antes).
@@ -371,8 +376,34 @@ async function procesar(data) {
   }
   if (chatId.includes('broadcast') || chatId.includes('status')) return;
 
-  // Contacto personal: se ignora entero y ACÁ, antes de tocar nada (más abajo ya se transcriben audios y se
-  // escribe el estado).
+  // #excluir / #incluir / #excluidos escritos por la cuenta del negocio en el chat de una persona. Van ANTES
+  // del corte de contactos personales: así se puede escribir #incluir en el chat de alguien ya excluido. No
+  // entran al historial ni al aprendizaje, no callan al bot y al cliente no le llega nada. Un cliente que
+  // escribe "#excluir" no excluye nada: solo cuenta lo que sale de la cuenta (fromMe).
+  if (data?.key?.fromMe && !esViejo(data)) {
+    const exc = excluidos.comando(textoDelMensaje(data));
+    if (exc) {
+      if (!autoria.esDelBot(chatId, data)) await confirmarExcluidos(excluidos.desdeChat(chatId, exc));
+      return;
+    }
+    // Un comando de los de siempre (#vendido, #recordar, #pausa, #reset…) en el chat de un EXCLUIDO: el bot
+    // ignora ese chat entero y no lo ejecuta; solo avisa al grupo para que nadie crea que quedó hecho. Con
+    // CONTACTOS_PERSONALES (el .env) sigue todo callado, como siempre.
+    if (evolution.motivoContactoPersonal(chatId) === 'excluido' && !autoria.esDelBot(chatId, data)) {
+      const comandoIgnorado = comandoEnChatExcluido(textoDelMensaje(data));
+      if (comandoIgnorado) {
+        const quien = String((state.todos()[chatId] || {}).nombre || '').trim() || chatId.split('@')[0];
+        const r = await evolution.avisarGrupo(
+          `❓ #${comandoIgnorado} en el chat de ${quien}: está excluido (#excluir), así que no hice nada. Para volver a atenderlo: #incluir`
+        );
+        if (r && r.bloqueado) console.log(`[excluidos] el aviso de #${comandoIgnorado} en un chat excluido no salio: ${r.motivo}`);
+        return;
+      }
+    }
+  }
+
+  // Contacto personal (CONTACTOS_PERSONALES o excluido con #excluir): se ignora entero y ACÁ, antes de tocar
+  // nada (más abajo ya se transcriben audios y se escribe el estado).
   if (evolution.esContactoPersonal(chatId)) return;
 
   // Al vincular el QR, WhatsApp manda el historial entero: solo interesa lo que pasa de acá en adelante.
@@ -613,6 +644,16 @@ async function procesar(data) {
   await atenderChat(chatId, nombre);
 }
 
+/**
+ * El nombre del comando de chat (#vendido, #perdido, #recordar, #hecho, #pausa, #sigue, #reset) con que
+ * EMPIEZA el texto, sin el '#', o null. Las mismas funciones que los ejecutan en el chat de un cliente.
+ */
+function comandoEnChatExcluido(texto) {
+  const t = String(texto || '').trim();
+  if (/^#reset/i.test(t)) return 'reset';
+  return (control.comando(t) || ventas.comando(t) || recordatorios.comando(t) || {}).tipo || null;
+}
+
 /** La línea del historial que se acaba de agregar en este chat. */
 function ultimaLinea(chatId) {
   const h = state.obtener(chatId).historial;
@@ -698,6 +739,8 @@ async function atenderChat(chatId, nombre) {
  * mientras se armaba o se mandaba la respuesta.
  */
 function motivoDeCorte(chatId, conocidas, cortarPorMensajeNuevo) {
+  // Un #excluir durante la tanda (esperando, pensando o mandando) frena lo que falta.
+  if (evolution.esContactoPersonal(chatId)) return MOTIVO_EXCLUIDO;
   const s = state.obtener(chatId);
   if (s.pausado) return 'el chat está pausado';
   if (control.callado(s)) return 'el chat está escalado';
@@ -706,8 +749,15 @@ function motivoDeCorte(chatId, conocidas, cortarPorMensajeNuevo) {
   return null;
 }
 
-/** El motivo del evento `silencio` para cada corte de `motivoDeCorte`. */
+/** El corte de una tanda cuando el chat pasó a ser un contacto personal (#excluir) con la tanda en vuelo. */
+const MOTIVO_EXCLUIDO = 'el chat está excluido';
+
+/**
+ * El motivo del evento `silencio` para cada corte de `motivoDeCorte`. 'excluido' (#excluir con la tanda ya
+ * en vuelo) es nuevo: el registro de aprendizaje lo anota como un silencio más, sin nada que mandar.
+ */
 const SILENCIO_DEL_CORTE = {
+  [MOTIVO_EXCLUIDO]: 'excluido',
   'el chat está pausado': 'pausado',
   'el chat está escalado': 'escalado',
   'escribió alguien de la cuenta': 'persona',
@@ -766,6 +816,12 @@ function pensarEnSombra(chatId, nombre, texto, tanda, { audio = false } = {}) {
  */
 async function contestarConSonnet(chatId, texto, nombre, { audio = false, fotos = [] } = {}) {
   const [ctx, bajadas] = await Promise.all([completarContexto(chatId), fotos.length ? fotosDelCliente.bajar(fotos) : null]);
+  // Lo excluyeron mientras se completaba el contexto: no se le pregunta nada a Sonnet. Sin mensajes y sin
+  // escalar: el freno que sigue en atenderTanda lo descarta y lo anota.
+  if (evolution.esContactoPersonal(chatId)) {
+    console.log(`[excluidos] ${chatId}: lo excluyeron mientras se completaba el contexto, no le pregunto a Sonnet`);
+    return { escalar: false, mensajes: [], callar: false };
+  }
   if (bajadas) {
     console.log(`[sonnet] ${chatId}: ${bajadas.mandadas} foto(s), Sonnet ve ${bajadas.imagenes.length}${bajadas.sinVer ? ` (${bajadas.sinVer} no se pudieron ver)` : ''}`);
   }
@@ -858,6 +914,14 @@ async function atenderTanda(chatId, nombre, cola, { cortarPorMensajeNuevo = true
     return;
   }
 
+  // Si mientras esperábamos la cuenta lo excluyó (#excluir), no se interpreta nada (ni Sonnet) y no sale nada.
+  if (evolution.esContactoPersonal(chatId)) {
+    console.log(`[excluidos] ${chatId}: lo excluyeron mientras esperaba, cancelo`);
+    aprendizaje.silencio(chatId, { motivo: SILENCIO_DEL_CORTE[MOTIVO_EXCLUIDO], lineas: idsDe(cola) });
+    pendientes.set(chatId, []);
+    return;
+  }
+
   // Si mientras esperábamos contestó una persona, o el chat quedó escalado, no se interpreta nada.
   if (!config.modoEscucha && (state.humanoActivo(chatId, config.silencioTrasHumanoMin) || control.callado(state.obtener(chatId)))) {
     console.log(`[${chatId}] contestó una persona o quedó escalado mientras esperaba, cancelo`);
@@ -872,6 +936,17 @@ async function atenderTanda(chatId, nombre, cola, { cortarPorMensajeNuevo = true
   // tanda siguiente.
   const disponibles = cola.length;
   const resultadosAudio = await Promise.all(cola.slice(0, disponibles).map((l) => transcripciones.get(l) || null));
+  // Lo excluyeron mientras se transcribía un audio: ni se arma la tanda ni piensa la sombra. Si
+  // confirmarExcluidos ya se llevó esta cola (sacó la entrada de pendientes y anotó el silencio), no se anota
+  // de nuevo; si la cola sigue siendo la de pendientes (se excluyó sin pasar por ahí), se anota y se vacía.
+  if (evolution.esContactoPersonal(chatId)) {
+    console.log(`[excluidos] ${chatId}: lo excluyeron mientras se transcribía, cancelo`);
+    if (pendientes.get(chatId) === cola) {
+      aprendizaje.silencio(chatId, { motivo: SILENCIO_DEL_CORTE[MOTIVO_EXCLUIDO], lineas: idsDe(cola) });
+      pendientes.set(chatId, []);
+    }
+    return;
+  }
   const tanda = [];
   const audios = [];
   let caracteres = 0;
@@ -935,6 +1010,12 @@ async function atenderTanda(chatId, nombre, cola, { cortarPorMensajeNuevo = true
         : audioFallido
         ? { escalar: true, motivo: `mandó un audio y no se pudo transcribir (${audioFallido.motivo})`, mensajes: [], callar: false }
         : await contestarConSonnet(chatId, texto, nombre, { audio: conTexto.some((l) => l.audio), fotos: imagenesDeLaTanda });
+    // Lo excluyeron mientras Sonnet pensaba: ni respuesta ni aviso al grupo.
+    if (evolution.esContactoPersonal(chatId)) {
+      console.log(`[excluidos] ${chatId}: lo excluyeron mientras se armaba la respuesta, cancelo`);
+      sinRespuesta(SILENCIO_DEL_CORTE[MOTIVO_EXCLUIDO]);
+      return;
+    }
     const ctx = state.obtener(chatId);
 
     const mensajes = (resultado.mensajes || []).slice(0, config.ritmo.maxMensajesPorTanda);
@@ -1259,6 +1340,8 @@ async function datosDeSalud() {
     numerosTester: config.numerosTester.length,
     numerosPiloto: config.pilotoTodos ? 'todos' : config.numerosPiloto.length,
     contactosPersonales: config.contactosPersonales.length,
+    // Excluidos por comando (#excluir): solo la cantidad.
+    excluidos: state.numerosExcluidos().length,
     soloChatsNuevos: config.soloChatsNuevos,
     chatsViejos: chatsViejos.resumen(),
     modoBorrador: config.modoBorrador,
@@ -1484,6 +1567,38 @@ async function atenderVenta(chatId, cmd, origen) {
   await confirmarVenta(ventas.marcar(chatId, cmd.tipo, origen));
 }
 
+/**
+ * Confirma al grupo lo que pasó con un #excluir / #incluir / #excluidos, venga del chat o del grupo. Si se
+ * excluyó a alguien, la tanda que tuviera esperando se descarta (la que ya está en vuelo la frenan
+ * `atenderTanda` y `motivoDeCorte`). Nunca manda nada al cliente.
+ */
+async function confirmarExcluidos({ tipo, numero, cambio, avisos }) {
+  if (cambio) console.log(`[excluidos] #${tipo} ${numero}`);
+  if (cambio) {
+    // Lo que el cliente dejó sin contestar mientras lo atendía una persona (o antes del cambio) no se lo
+    // contesta el barrido del silencio de pronto cuando se lo vuelve a incluir: se da por atendido. Solo
+    // los chats que ya existen (state.actualizar crearía uno vacío para un número que nunca escribió).
+    for (const id of Object.keys(state.todos())) {
+      if (id.endsWith('@s.whatsapp.net') && evolution.estaEnLaLista(id, [numero])) state.actualizar(id, { silencioAtendido: Date.now() });
+    }
+  }
+  if (cambio && tipo === 'excluir') {
+    for (const id of [...pendientes.keys()]) {
+      if (!evolution.estaEnLaLista(id, [numero])) continue;
+      const cola = pendientes.get(id) || [];
+      if (cola.length) aprendizaje.silencio(id, { motivo: SILENCIO_DEL_CORTE[MOTIVO_EXCLUIDO], lineas: idsDe(cola) });
+      pendientes.delete(id);
+    }
+  }
+  for (const aviso of avisos) {
+    const r = await evolution.avisarGrupo(aviso);
+    if (r && r.bloqueado) {
+      console.log(`[excluidos] ${cambio ? 'queda guardado, pero ' : ''}la confirmacion no salio: ${r.motivo}`);
+      break;
+    }
+  }
+}
+
 /** Confirma al grupo un #pausa / #sigue escrito en el grupo con el número. */
 async function confirmarControl({ chatId, tipo, cambio, aviso }) {
   if (chatId) console.log(`[control] ${chatId}: #${tipo} desde el grupo${cambio ? '' : ' (no cambió nada)'}`);
@@ -1605,6 +1720,8 @@ function anunciarModo() {
   // Bien visible: cuántos contactos personales se ignoran.
   const n = config.contactosPersonales.length;
   console.log(`CONTACTOS PERSONALES: ${n} numero${n === 1 ? '' : 's'} en la lista negra${n ? ', se ignoran por completo' : ''}.`);
+  const ex = state.numerosExcluidos().length;
+  console.log(`EXCLUIDOS por comando: ${ex} numero${ex === 1 ? '' : 's'}${ex ? ', se ignoran por completo (#excluidos en el grupo)' : ''}.`);
   const testers = config.numerosTester.length;
   const pilotos = config.numerosPiloto.length;
   if (config.pilotoTodos) {
