@@ -1,6 +1,6 @@
 # Reglas del cerebro de Somos Piedra — BORRADOR v2 para aprobar (Etapa 2)
 
-Estado: borrador v2 del 23/10/2026 (la v1 es del 15/10 y está en git). Suma las respuestas de Fran del 23/10 (`respuestas-fran-2026-10-23-agente.txt` y `...-simulador-gestion.txt`) y las decisiones de Tomás del 23/10. Nada de esto está en el bot: se aprueba, se completa con la ronda 2 de Fran (`preguntas-fran-ronda2.md`) y recién ahí se copia a `src/cerebro-reglas.md`.
+Estado: **APROBADO por Tomás el 06/11/2026** (borrador v2 del 23/10/2026) (la v1 es del 15/10 y está en git). Suma las respuestas de Fran del 23/10 (`respuestas-fran-2026-10-23-agente.txt` y `...-simulador-gestion.txt`) y las decisiones de Tomás del 23/10. Nada de esto está en el bot: se aprueba, se completa con la ronda 2 de Fran (`preguntas-fran-ronda2.md`) y recién ahí se copia a `src/cerebro-reglas.md`.
 
 Leyenda:
 - `[FRAN]` dato del local que todavía falta. El bot no lo dice hasta tenerlo.
