@@ -127,7 +127,8 @@ async function despachar() {
     p.intentos++;
     let r;
     try {
-      r = await evolution.avisarGrupo(p.texto);
+      // Inmediato: el guardián tiene su propia franja, y un corte de Evolution no puede esperar a las 9.
+      r = await evolution.avisarGrupo(p.texto, { inmediato: true });
     } catch (e) {
       r = { bloqueado: true, motivo: e.message };
     }

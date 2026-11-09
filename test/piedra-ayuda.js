@@ -36,6 +36,15 @@ function preparar(entorno = {}) {
     SOLO_CHATS_NUEVOS: '',
     CONTACTOS_PERSONALES: '',
     GRUPO_AVISOS_JID: GRUPO,
+    // Los avisos al grupo, sin franja (en produccion 9 a 20) y los precios del panel sin credenciales, con el
+    // cache en la carpeta temporal: un test nunca toca data/precios/ ni sale a Supabase.
+    AVISOS_HORA_DESDE: '0',
+    AVISOS_HORA_HASTA: '24',
+    SUPABASE_URL: '',
+    SUPABASE_ANON_KEY: '',
+    ERASMO_EMAIL: '',
+    ERASMO_PASSWORD: '',
+    PRECIOS_CACHE_PATH: path.join(TMP, 'precios', 'panel-cache.json'),
     SILENCIO_TRAS_HUMANO_MIN: '45',
     IGNORAR_ANTERIORES_SEG: '120',
     DATOS_VIEJOS_HORAS: '72',
@@ -120,7 +129,7 @@ function preparar(entorno = {}) {
   const alGrupo = [];
   let idEnvio = 0;
   const respuestaEvolution = (numero) => ({ key: { remoteJid: numero, fromMe: true, id: 'EV' + ++idEnvio } });
-  const real = { avisarGrupo: evolution.avisarGrupo };
+  const real = { avisarGrupo: evolution.avisarGrupo, enviarDocumento: evolution.enviarDocumento };
   evolution.enviarTexto = async (numero, texto) => {
     aClientes.push({ numero, texto });
     return respuestaEvolution(numero);

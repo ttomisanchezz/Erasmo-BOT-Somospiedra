@@ -24,7 +24,9 @@ for (const [nombre, archivo] of Object.entries({ ESTADO_PATH: 'estado.json', APR
 Object.assign(process.env, { EVOLUTION_URL: 'http://evolution.de.mentira', EVOLUTION_INSTANCE: 'somospiedra',
   EVOLUTION_APIKEY: 'clave-de-mentira', GRUPO_AVISOS_JID: '120363000000000077@g.us',
   MODO_BORRADOR: 'false', MODO_ESCUCHA: 'false', NUMEROS_TESTER: '', NUMEROS_PILOTO: '',
-  NUMEROS_PRUEBA: '', SOLO_CHATS_NUEVOS: '', CONTACTOS_PERSONALES: '', ESTADO_SOLO_LECTURA: '' });
+  NUMEROS_PRUEBA: '', SOLO_CHATS_NUEVOS: '', CONTACTOS_PERSONALES: '', ESTADO_SOLO_LECTURA: '',
+  // Los avisos al grupo salen de 9 a 20 en producción: este test llama al avisarGrupo real y espera que salga ya.
+  AVISOS_HORA_DESDE: '0', AVISOS_HORA_HASTA: '24' });
 const pedidos = [];
 let fallaEvolution = false;
 globalThis.fetch = async (url, opciones) => {

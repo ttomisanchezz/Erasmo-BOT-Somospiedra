@@ -136,6 +136,8 @@ async function enviarDocumento(numero, rutaLocal, caption = '', delayMs = 1200) 
   if (apagadaPara(numero)) return APAGADA;
   if (esContactoPersonal(numero)) return CONTACTO;
   if (config.modoEscucha) return { bloqueado: true, motivo: 'modo escucha' };
+  // Modo borrador: al cliente no le sale nada (index.js manda el borrador de los textos al grupo, con la nota del PDF).
+  if (config.modoBorrador) return { bloqueado: true, motivo: 'modo borrador' };
   if (!archivoPermitido(rutaLocal, documentos.CARPETA, EXTENSIONES_DOCUMENTO)) {
     return fueraDelCatalogo('documento', rutaLocal);
   }
@@ -422,8 +424,13 @@ function avisosGrupo() {
   return { noSalieron: avisosNoSalidos.noSalieron, ultimo: avisosNoSalidos.ultimo ? { ...avisosNoSalidos.ultimo } : null };
 }
 
-/** Aviso al grupo interno del negocio. */
-async function avisarGrupo(texto) {
+/**
+ * Aviso al grupo interno del negocio. Sale de AVISOS_HORA_DESDE a _HASTA (9 a 20, Argentina; src/avisos-cola.js):
+ * afuera de la franja se encola (estado.json) y sale con los demás cuando abre, en un solo mensaje. Devuelve
+ * `{ encolado: true }` (no es `bloqueado`: quien llama lo da por hecho, y sale solo). `inmediato: true` lo manda
+ * ahora: las respuestas a un comando que alguien escribió en este momento, el guardián y el estado dañado.
+ */
+async function avisarGrupo(texto, { inmediato = false } = {}) {
   const motivo = motivoBloqueoAvisos();
   if (motivo) {
     console.log('[aviso bloqueado] ' + motivo);
@@ -443,6 +450,14 @@ async function avisarGrupo(texto) {
     );
     noSalio('el destino es un chat de cliente');
     return;
+  }
+  if (!inmediato) {
+    const cola = require('./avisos-cola');
+    if (!cola.enFranja(Date.now())) {
+      const esperando = cola.encolar(texto);
+      console.log(`[aviso] afuera de la franja de avisos (${config.avisos.horaDesde} a ${config.avisos.horaHasta}): queda en la cola (${esperando})`);
+      return { encolado: true };
+    }
   }
   try {
     return await enviarTexto(config.grupoAvisos, texto, 0);

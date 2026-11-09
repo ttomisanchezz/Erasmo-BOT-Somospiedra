@@ -50,6 +50,9 @@ const { textoDelMensaje, marcadorSinTexto, LINEA_FOTO, esFotoDelCliente, conCita
 const anuncio = require('./anuncio');
 // El interruptor general (#apagar / #prender).
 const interruptor = require('./interruptor');
+const documentos = require('./documentos');
+const seguimiento = require('./seguimiento');
+const avisosCola = require('./avisos-cola');
 // Acuses y agradecimientos: el barrido del silencio y #sigue no contestan solo eso.
 const { esCierre } = require('./cierre');
 
@@ -332,7 +335,8 @@ async function comandoDelGrupo(data) {
   // Los avisos del bot también vuelven por acá como propios; no se confunden porque un comando solo cuenta
   // si el mensaje empieza con él.
   const cmd = recordatorios.comando(texto);
-  if (cmd) await evolution.avisarGrupo(recordatorios.ayuda(cmd.tipo === 'hecho' ? 'hecho-en-grupo' : 'recordar-en-grupo'));
+  // Las respuestas a un comando que alguien acaba de escribir salen ya (`inmediato`): no esperan a las 9.
+  if (cmd) await evolution.avisarGrupo(recordatorios.ayuda(cmd.tipo === 'hecho' ? 'hecho-en-grupo' : 'recordar-en-grupo'), { inmediato: true });
   // #vendido y #perdido con el número del cliente: marcan ese chat.
   const venta = ventas.comando(texto);
   if (venta) await confirmarVenta(ventas.desdeGrupo(venta, data?.key?.id));
@@ -394,7 +398,8 @@ async function procesar(data) {
       if (comandoIgnorado) {
         const quien = String((state.todos()[chatId] || {}).nombre || '').trim() || chatId.split('@')[0];
         const r = await evolution.avisarGrupo(
-          `❓ #${comandoIgnorado} en el chat de ${quien}: está excluido (#excluir), así que no hice nada. Para volver a atenderlo: #incluir`
+          `❓ #${comandoIgnorado} en el chat de ${quien}: está excluido (#excluir), así que no hice nada. Para volver a atenderlo: #incluir`,
+          { inmediato: true }
         );
         if (r && r.bloqueado) console.log(`[excluidos] el aviso de #${comandoIgnorado} en un chat excluido no salio: ${r.motivo}`);
         return;
@@ -771,6 +776,41 @@ function motivoDelSilencio(chatId) {
   return 'escalado';
 }
 
+/**
+ * Manda el catálogo en PDF que pidió `mandar_catalogo`, después de los mensajes. Es el mismo camino que un
+ * texto: "escribiendo…", la espera del ritmo, el control (pausa, escalado, una persona, un mensaje nuevo) y
+ * `enviarAlCliente` (así el eco del documento cuenta como del bot y no como una persona de la cuenta). Los
+ * candados de evolution.js (escucha, borrador, listas, excluidos, carpeta y extensión) los pone `enviarDocumento`.
+ * Queda en el historial y la marca de las 24 h (`catalogoEnviado`) solo si Evolution lo confirmó. Devuelve si salió.
+ */
+async function mandarCatalogo(chatId, conocidas, cortarPorMensajeNuevo, donde) {
+  const ruta = documentos.ruta('catalogo');
+  if (!ruta) {
+    console.error(`[catalogo] ${chatId}: falta el PDF del catálogo en documentos/, no lo mando`);
+    return false;
+  }
+  await evolution.mostrarEscribiendo(chatId, config.ritmo.entreMensajesMs);
+  await dormir(config.ritmo.entreMensajesMs);
+  state.comprobarVigente(chatId);
+  const corte = motivoDeCorte(chatId, conocidas, cortarPorMensajeNuevo);
+  if (corte) {
+    console.log(`[corte] ${chatId}: ${corte}, el catálogo queda sin mandar`);
+    return false;
+  }
+  const enviado = await enviarAlCliente(chatId, 'documento', documentos.nombre('catalogo'), () => evolution.enviarDocumento(chatId, ruta, '', 0), null, donde);
+  anotarEnvio(chatId, enviado);
+  if (!autoria.llego(enviado)) {
+    console.log(`[catalogo] ${chatId}: el catálogo no salió${enviado && enviado.motivo ? ` (${enviado.motivo})` : ''}`);
+    return false;
+  }
+  const ahora = Date.now();
+  state.agregarAlHistorial(chatId, 'vendedor', '[le mandé el catálogo en PDF]', { id: enviado.key.id });
+  const s = state.obtener(chatId);
+  state.actualizar(chatId, { catalogoEnviado: ahora, ultimoBot: ahora, ficha: { ...(s.ficha || {}), catalogoEnviado: ahora } });
+  console.log(`[catalogo] ${chatId}: catálogo enviado`);
+  return true;
+}
+
 /** Los ids de WhatsApp de unas líneas de la cola (las fotos y los pedidos del catálogo no tienen). */
 const idsDe = (lineas) => lineas.map((l) => (datosDeLinea.get(l) || {}).id || null).filter(Boolean);
 
@@ -891,6 +931,19 @@ async function revisarGastoMes(ahora = Date.now()) {
 }
 
 setInterval(() => revisarGastoMes().catch(() => {}), 5 * 60 * 1000);
+
+/**
+ * Cuando abre la franja de avisos (9, hora de Argentina): primero salen juntos, en un solo mensaje, los avisos que se
+ * generaron afuera (la cola de estado.json) y después los seguimientos de hoy ("hoy toca volver a contactar a…").
+ * Cada minuto, así salen a las 9 en punto. Todo lo que no sale queda para el barrido siguiente.
+ */
+async function revisarAvisosPendientes(ahora = Date.now()) {
+  if (evolution.motivoBloqueoAvisos()) return;
+  await avisosCola.vaciar((texto) => evolution.avisarGrupo(texto, { inmediato: true }), ahora);
+  await seguimiento.avisarLosDeHoy(ahora);
+}
+
+setInterval(() => revisarAvisosPendientes().catch((e) => console.error('[avisos] el barrido falló:', e.message)), 60 * 1000);
 
 /**
  * En qué modo se armó una propuesta, para el registro de aprendizaje: 'escucha', 'borrador',
@@ -1043,6 +1096,9 @@ async function atenderTanda(chatId, nombre, cola, { cortarPorMensajeNuevo = true
               ms: deSonnet.ms == null ? null : deSonnet.ms,
               guardia: deSonnet.guardia || null,
               herramientas: deSonnet.herramientas || [],
+              // Para `npm run pruebas`: lo que pidió y devolvió cada herramienta de datos, y los montos que dejó escribir.
+              ...(deSonnet.llamadas && deSonnet.llamadas.length ? { llamadas: deSonnet.llamadas } : {}),
+              montos: deSonnet.montosDeHerramientas || [],
               leidos: deSonnet.leidos || null,
               ...(deSonnet.frenados ? { frenados: deSonnet.frenados } : {}),
               ...(deSonnet.corregida ? { corregida: deSonnet.corregida } : {}),
@@ -1115,7 +1171,7 @@ async function atenderTanda(chatId, nombre, cola, { cortarPorMensajeNuevo = true
           chatId,
           nombre,
           motivo: resultado.escalar ? resultado.motivo : 'respuesta automática',
-          borrador: mensajes.map(acciones.comoTexto).join('\n'),
+          borrador: mensajes.map(acciones.comoTexto).join('\n') + (resultado.acciones && resultado.acciones.catalogo ? '\n[+ catálogo en PDF]' : ''),
         })
       );
       state.actualizar(chatId, { ultimoBot: Date.now() });
@@ -1155,6 +1211,15 @@ async function atenderTanda(chatId, nombre, cola, { cortarPorMensajeNuevo = true
       // Sin id de Evolution no se sabe si le llegó: no cuenta como "ya se lo dije".
       state.agregarAlHistorial(chatId, 'vendedor', t, autoria.llego(enviado) ? { id: enviado.key.id } : { sinConfirmar: true });
       state.actualizar(chatId, { ultimoBot: Date.now() });
+    }
+
+    // Lo que pidieron las herramientas (el catálogo, el seguimiento) se hace ACÁ, después de los mensajes y por
+    // el mismo camino (un corte antes de cada envío lo frena). Un turno que escaló no deja acciones.
+    const acc = resultado.acciones || {};
+    const catalogoSalio = acc.catalogo ? await mandarCatalogo(chatId, conocidas, cortarPorMensajeNuevo, donde) : false;
+    if (acc.seguimiento && (enviados || catalogoSalio)) {
+      seguimiento.anotar(chatId, acc.seguimiento);
+      console.log(`[seguimiento] ${chatId}: volver a contactar el ${acc.seguimiento.fecha}`);
     }
     await siContestoSonnet();
 
@@ -1388,7 +1453,7 @@ async function avisarEstadoDanado() {
     (info.copia ? `Quedó una copia tal cual en ${info.copia}\n` : 'No pude guardar una copia.\n') +
     'El bot arrancó sin memoria de los chats.';
   try {
-    await evolution.avisarGrupo(texto);
+    await evolution.avisarGrupo(texto, { inmediato: true });
   } catch (e) {
     console.error('[estado] no pude avisar al grupo que el estado estaba dañado:', e.message);
   }
@@ -1558,7 +1623,7 @@ async function atenderComando(chatId, cmd, origen) {
     console.log(`[recordatorio] ${resultado.cerrado ? 'cerrado' : 'no habia nada para cerrar'} en ${chatId}`);
   }
   if (!resultado.aviso) return;
-  const r = await evolution.avisarGrupo(resultado.aviso);
+  const r = await evolution.avisarGrupo(resultado.aviso, { inmediato: true });
   if (r && r.bloqueado) console.log(`[recordatorio] queda guardado, pero la confirmacion no salio: ${r.motivo}`);
 }
 
@@ -1591,7 +1656,7 @@ async function confirmarExcluidos({ tipo, numero, cambio, avisos }) {
     }
   }
   for (const aviso of avisos) {
-    const r = await evolution.avisarGrupo(aviso);
+    const r = await evolution.avisarGrupo(aviso, { inmediato: true });
     if (r && r.bloqueado) {
       console.log(`[excluidos] ${cambio ? 'queda guardado, pero ' : ''}la confirmacion no salio: ${r.motivo}`);
       break;
@@ -1603,21 +1668,21 @@ async function confirmarExcluidos({ tipo, numero, cambio, avisos }) {
 async function confirmarControl({ chatId, tipo, cambio, aviso }) {
   if (chatId) console.log(`[control] ${chatId}: #${tipo} desde el grupo${cambio ? '' : ' (no cambió nada)'}`);
   if (!aviso) return;
-  const r = await evolution.avisarGrupo(aviso);
+  const r = await evolution.avisarGrupo(aviso, { inmediato: true });
   if (r && r.bloqueado) console.log(`[control] la confirmacion no salio: ${r.motivo}`);
 }
 
 /** Contesta en el grupo un #apagar / #prender. */
 async function confirmarInterruptor({ tipo, cambio, aviso }) {
   console.log(`[interruptor] #${tipo} desde el grupo${cambio ? '' : ' (no cambió nada)'}`);
-  const r = await evolution.avisarGrupo(aviso);
+  const r = await evolution.avisarGrupo(aviso, { inmediato: true });
   if (r && r.bloqueado) console.log(`[interruptor] la confirmacion no salio: ${r.motivo}`);
 }
 
 /** Contesta en el grupo un #sonnet, #comparar, #bot o #sonnet-si. */
 async function confirmarComandoSonnet({ tipo }, aviso) {
   console.log(`[sonnet] #${tipo} desde el grupo`);
-  const r = await evolution.avisarGrupo(aviso);
+  const r = await evolution.avisarGrupo(aviso, { inmediato: true });
   if (r && r.bloqueado) console.log(`[sonnet] la respuesta de #${tipo} no salió: ${r.motivo}`);
 }
 
@@ -1625,8 +1690,8 @@ async function confirmarComandoSonnet({ tipo }, aviso) {
 async function confirmarVenta({ chatId, tipo, cambio, aviso }) {
   if (cambio) console.log(`[ventas] ${chatId} anotado como ${tipo}`);
   if (!aviso) return;
-  const r = await evolution.avisarGrupo(aviso);
-  if (r && r.bloqueado) console.log(`[ventas] ${cambio ? 'queda guardado, pero ' : ''}la confirmacion no salio: ${r.motivo}`);
+  const r = await evolution.avisarGrupo(aviso, { inmediato: true });
+  if (r && r.bloqueado) console.log(`[ventas]${cambio ? 'queda guardado, pero ' : ''}la confirmacion no salio: ${r.motivo}`);
 }
 
 /**

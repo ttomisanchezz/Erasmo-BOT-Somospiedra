@@ -19,16 +19,18 @@
  * dos herramientas: `responder` (de 1 a 4 mensajes) o `escalar` (no le llega nada al cliente; el motivo va
  * al grupo). Lo que no termina así cuenta como escalar.
  *
- * Herramientas de datos: hoy ninguna. Las de Piedra (`buscar_productos`, `cotizar`, prompt 4) se suman en
- * `HERRAMIENTAS_DE_DATOS`: cada una trae su definición para la API y una función que corre con el input y
- * el `turno`; los montos que devuelva van a `turno.montos`, que son los ÚNICOS que la guardia deja escribir.
+ * Herramientas de datos (src/herramientas-erasmo.js): `buscar_productos`, `cotizar`, `mandar_catalogo` y
+ * `agendar_seguimiento`. Cada una trae su definición para la API y una función que corre con el input y el
+ * `turno`; los montos que devuelva van a `turno.montos`, que son los ÚNICOS que la guardia deja escribir. Las
+ * dos últimas no hacen nada en el acto: anotan en `turno.acciones` y las ejecuta index.js después de mandar
+ * los mensajes (y solo si el turno no termina en `escalar`).
  *
  * La guardia (`revisarSalida`), antes de que algo pueda salir: tope de 4 mensajes (del 4º en adelante van
  * juntos en el 4º) de 300 caracteres como máximo; cualquier monto que no haya devuelto una herramienta de
- * ESTA respuesta frena (hoy, sin herramientas de precio, cualquier monto frena; un año suelto o una
- * dirección no son montos); nada de prometer que otra persona lo va a contactar ni volver a escribir
- * (src/promesas.js), ni "te falta", ni mandar algo después, ni archivos; nada interno (herramientas, el
- * sistema, escalar…); sin marcas de IA ni caracteres raros. Si frena, Sonnet tiene UNA vuelta para
+ * ESTA respuesta frena (un año suelto o una dirección no son montos); nada de prometer que otra persona lo
+ * va a contactar ni volver a escribir (src/promesas.js), ni "te falta", ni mandar algo después, ni archivos
+ * (salvo el catálogo en PDF, y solo si `mandar_catalogo` salió bien en ESTA respuesta); nada interno
+ * (herramientas, el sistema, escalar…); sin marcas de IA ni caracteres raros. Si frena, Sonnet tiene UNA vuelta para
  * corregirlo; si vuelve a frenar, escala.
  *
  * Sin dependencias npm: `fetch` a la API de Anthropic, con timeout y un reintento ante 429/5xx o error de
@@ -47,6 +49,8 @@ const evolution = require('./evolution');
 const chatsViejos = require('./chats-viejos');
 const contexto = require('./contexto');
 const salida = require('./salida');
+const herramientasErasmo = require('./herramientas-erasmo');
+const ficha = require('./ficha');
 
 /** Las instrucciones: se leen una vez, al arrancar. Van con cache_control (se reaprovechan). */
 const REGLAS = fs.readFileSync(path.join(__dirname, 'cerebro-reglas.md'), 'utf8');
@@ -104,11 +108,10 @@ const RESPONDER = {
 /**
  * Las herramientas de datos: `{ definicion, correr(input, turno) }`. `definicion` es lo que va a la API
  * (name, description, input_schema, strict); `correr` devuelve lo que vuelve como tool_result (un objeto;
- * con `error`, vuelve como is_error) y anota en `turno.montos` los montos que se pueden escribir. Hoy
- * ninguna: `buscar_productos` y `cotizar` de Piedra se conectan acá (prompt 4, con cotizador-piedra.js y
- * catalogo-piedra.js).
+ * con `error`, vuelve como is_error) y anota en `turno.montos` los montos que se pueden escribir (en pesos)
+ * y en `turno.acciones` lo que hay que hacer cuando salgan los mensajes (el catálogo, el seguimiento).
  */
-const HERRAMIENTAS_DE_DATOS = [];
+const HERRAMIENTAS_DE_DATOS = herramientasErasmo.HERRAMIENTAS;
 
 /** Las herramientas del pedido: las de datos y las dos que terminan el turno. */
 const herramientasEfectivas = () => [...HERRAMIENTAS_DE_DATOS.map((h) => h.definicion), ESCALAR, RESPONDER];
@@ -331,7 +334,7 @@ function sinMarcasDeIA(texto) {
  */
 const LO_INTERNO = new RegExp(
   [
-    '\\b(?:buscar_productos|cotizar_\\w+|tool_use|tool_result)\\b',
+    '\\b(?:buscar_productos|mandar_catalogo|agendar_seguimiento|simular_piedra|presupuesto_pdf|cotizar_\\w+|tool_use|tool_result)\\b',
     '\\bcotizar\\(',
     '\\b(?:el sistema|la planilla|el historial|la herramienta|persona de la cuenta|grupo interno)\\b',
     '\\b(?:escalo|escalar|escale|escalado)\\b',
@@ -346,15 +349,17 @@ function nombraAlgoInterno(texto) {
 
 /**
  * La promesa de un archivo: "te paso", "te mando", "te envío" o "ahí va(n)" y, en las 6 palabras que
- * siguen (sin cortar la frase), fotos, video, pdf, archivo, ubicación, link o catálogo. El bot de Piedra no
- * manda archivos. "Te paso los datos" no es un archivo. Devuelve lo que promete, o null.
+ * siguen (sin cortar la frase), fotos, video, pdf, archivo, ubicación, link o catálogo. El único archivo que
+ * Erasmo manda es el catálogo en PDF, y solo por `mandar_catalogo`: `permitidos` (['catalogo', 'pdf']) lo deja
+ * pasar, y solo si la herramienta salió bien en ESTE turno. "Te paso los datos" no es un archivo. Devuelve lo
+ * que promete, o null.
  */
 const PROMETE = /\b(?:te paso|te mando|te envio|ahi van?)\b((?:\s+[^\s.?!]+){1,6})/g;
 const ARCHIVO = /\b(?:fotos?|videos?|pdf|archivos?|ubicacion|link|catalogo)\b/g;
 
-function prometeArchivo(texto) {
+function prometeArchivo(texto, permitidos = []) {
   for (const m of promesas.sinTildes(texto).matchAll(PROMETE)) {
-    const noVa = (m[1].match(ARCHIVO) || [])[0];
+    const noVa = (m[1].match(ARCHIVO) || []).find((a) => !permitidos.includes(a));
     if (noVa) return m[0].slice(0, m[0].indexOf(noVa, m[0].length - m[1].length) + noVa.length).trim();
   }
   return null;
@@ -379,15 +384,15 @@ function caracterRaro(texto) {
  * Lo que contestaría, revisado antes de que pueda salir. Cada mensaje pasa por `sinMarcasDeIA` y:
  *   - como mucho 4 mensajes: si vienen más, del cuarto en adelante van juntos en el cuarto, separados por
  *     un salto de línea. Cada uno de hasta 300 caracteres, el cuarto ya juntado;
- *   - todo monto tiene que estar entre los que devolvieron las herramientas en ESTA respuesta (`montos`):
- *     hoy no hay herramientas de precio, así que cualquier monto frena;
+ *   - todo monto tiene que estar entre los que devolvieron las herramientas en ESTA respuesta (`montos`, en
+ *     pesos): sin llamar a `cotizar`, cualquier monto frena;
  *   - todo monto va con puntos de miles;
  *   - nada de prometer a otra persona ni de prometer volver (src/promesas.js), ni "te falta(n)", ni
- *     mandar algo después, ni un archivo;
+ *     mandar algo después, ni un archivo (salvo el catálogo, con `catalogo`: `mandar_catalogo` salió bien);
  *   - nada que nombre algo interno, ni un tab u otro caracter raro.
  * Devuelve { mensajes, guardia: null } o { mensajes: [], guardia: 'qué no pasó', frenados }.
  */
-function revisarSalida(mensajes, montos = []) {
+function revisarSalida(mensajes, montos = [], { catalogo = false } = {}) {
   const crudos = Array.isArray(mensajes) ? mensajes.map((m) => String(m == null ? '' : m)) : [];
   if (!crudos.length) return { mensajes: [], guardia: 'responder sin mensajes', frenados: [] };
   const problemas = [];
@@ -402,7 +407,7 @@ function revisarSalida(mensajes, montos = []) {
         problemas.push(
           validos.size
             ? `monto que no salió de ninguna herramienta: ${pesos(monto)}`
-            : `escribió un monto (${pesos(monto)}) y todavía no hay precios cargados: no se escribe ningún monto`
+            : `escribió un monto (${pesos(monto)}) que no salió de ninguna herramienta de esta respuesta: los montos salen solo de cotizar`
         );
       }
     }
@@ -419,7 +424,7 @@ function revisarSalida(mensajes, montos = []) {
     if (despues) problemas.push(`promete mandar algo después: "${despues[0]}"`);
     const interno = nombraAlgoInterno(m);
     if (interno) problemas.push(`nombra algo interno: "${interno}"`);
-    const archivo = prometeArchivo(m);
+    const archivo = prometeArchivo(m, catalogo ? ['catalogo', 'pdf'] : []);
     if (archivo) problemas.push(`promete un archivo que no va: "${archivo}"`);
     const raro = caracterRaro(m);
     if (raro) problemas.push(`caracter que no va en WhatsApp: ${raro} (escribí esa parte de nuevo, con las palabras enteras)`);
@@ -432,8 +437,12 @@ function revisarSalida(mensajes, montos = []) {
 // Las herramientas de datos, al correr
 // ---------------------------------------------------------------------------
 
-/** Lo que dejaron las herramientas en un turno: los montos que se pueden escribir (la guardia). */
-const turnoEnCero = () => ({ montos: [], ahora: Date.now() });
+/**
+ * Lo que dejaron las herramientas en un turno: los montos que se pueden escribir, en pesos (la guardia), y las
+ * `acciones` pendientes (`catalogo`: true, `seguimiento`: { fecha, motivo }) que index.js ejecuta cuando salen
+ * los mensajes. `chatId` y `enVivo` los pone `pensar`; `cotizo` es lo último que se cotizó (para la ficha).
+ */
+const turnoEnCero = () => ({ montos: [], acciones: {}, cotizo: null, chatId: null, enVivo: false, ahora: Date.now() });
 
 /** El tool_result de un tool_use de datos. Un error de la herramienta vuelve como is_error. */
 async function resultadoDe(bloque, turno) {
@@ -444,6 +453,8 @@ async function resultadoDe(bloque, turno) {
   } catch (e) {
     r = { error: `La herramienta falló (${e.message}): escalá.` };
   }
+  // Para el registro de pruebas: qué se pidió y qué devolvió (nada personal: producto, cantidades y totales).
+  if (Array.isArray(turno.llamadas)) turno.llamadas.push({ herramienta: bloque.name, entrada: bloque.input || {}, salida: r });
   return { type: 'tool_result', tool_use_id: bloque.id, content: JSON.stringify(r), ...(r && r.error ? { is_error: true } : {}) };
 }
 
@@ -615,9 +626,10 @@ function textoDeCorreccion(guardia) {
   return (
     `Tu respuesta NO salió, el sistema la frenó: ${guardia}. ` +
     'Corregila y volvé a llamar a responder: como mucho 4 mensajes, cada uno de hasta 300 caracteres; ' +
-    'sin ningún monto que no haya devuelto una herramienta de ESTA respuesta (hoy no hay precios cargados: ninguno), ' +
+    'sin ningún monto que no haya devuelto una herramienta de ESTA respuesta (los montos salen solo de cotizar), ' +
     'sin decir cuánto le falta, sin prometer que otra persona o vos lo van a contactar, sin nombrar nada interno ' +
-    '(herramientas, el sistema, el historial, escalar) y sin prometer archivos (fotos, videos, ubicación, links). ' +
+    '(herramientas, el sistema, el historial, escalar) y sin prometer archivos (fotos, videos, ubicación, links; el ' +
+    'catálogo solo si llamaste a mandar_catalogo en esta respuesta). ' +
     'Si no podés contestar sin eso, llamá a escalar.'
   );
 }
@@ -636,13 +648,17 @@ function textoDeCorreccion(guardia) {
  * `image` en base64 en el primer mensaje, después del texto del contexto, y la última lleva
  * `cache_control`. `fotos` ({ mandadas, sinVer }) es lo que dice el pedido.
  */
-async function pensar({ chatId, mensaje, nombre = '', ahora = Date.now(), hasta = null, audio = false, imagenes = [], fotos = null } = {}) {
+async function pensar({ chatId, mensaje, nombre = '', ahora = Date.now(), hasta = null, audio = false, imagenes = [], fotos = null, enVivo = false } = {}) {
   const t0 = Date.now();
   const uso = usoEnCero();
   const turno = turnoEnCero();
   turno.ahora = Number(ahora) || Date.now();
+  turno.chatId = chatId;
+  turno.enVivo = enVivo === true;
   const montos = turno.montos;
   const herramientas = [];
+  const llamadas = [];
+  turno.llamadas = llamadas;
   let leidos = null;
   let corregida = null;
   const vistas = Array.isArray(imagenes) ? imagenes : [];
@@ -650,7 +666,8 @@ async function pensar({ chatId, mensaje, nombre = '', ahora = Date.now(), hasta 
   const sinVer = Number(fotos && fotos.sinVer) || 0;
   const deFotos = mandadas ? { imagenes: { vistas: vistas.length, sin_ver: sinVer } } : {};
   const fin = (r) => ({ ...r, uso, usd: seisDecimales(costo(uso)), ms: Date.now() - t0, ...(leidos ? { leidos } : {}), ...deFotos });
-  const comun = () => ({ montosDeHerramientas: montos, herramientas });
+  // `llamadas`: lo que pidió y devolvió cada herramienta de datos (para `npm run pruebas`); `cotizo`: lo último cotizado.
+  const comun = () => ({ montosDeHerramientas: montos, herramientas, llamadas, cotizo: turno.cotizo });
   const escala = (motivo, extra = {}) => fin({ mensajes: [], escalar: true, motivo, guardia: null, ...comun(), ...extra });
   try {
     if (!config.cerebro.apikey) return fin({ error: 'falta ANTHROPIC_API_KEY' });
@@ -686,7 +703,7 @@ async function pensar({ chatId, mensaje, nombre = '', ahora = Date.now(), hasta 
       }
       if (respondio) {
         herramientas.push('responder');
-        const r = revisarSalida(respondio.input && respondio.input.mensajes, montos);
+        const r = revisarSalida(respondio.input && respondio.input.mensajes, montos, { catalogo: turno.acciones.catalogo === true });
         if (r.guardia) {
           // Una vuelta más para corregir: el responder vuelve como error con el motivo, y las herramientas
           // de datos que vinieron en la misma respuesta se contestan como siempre (la API pide un
@@ -707,7 +724,7 @@ async function pensar({ chatId, mensaje, nombre = '', ahora = Date.now(), hasta 
           }
           return escala(`guardia: ${r.guardia}`, { guardia: r.guardia, frenados: r.frenados, ...(corregida ? { corregida } : {}) });
         }
-        return fin({ mensajes: r.mensajes, escalar: false, motivo: '', guardia: null, ...comun(), ...(corregida ? { corregida } : {}) });
+        return fin({ mensajes: r.mensajes, escalar: false, motivo: '', guardia: null, ...comun(), acciones: turno.acciones, ...(corregida ? { corregida } : {}) });
       }
       if (!usos.length) {
         return escala(`Sonnet no terminó con responder ni escalar${resp.stop_reason === 'max_tokens' ? ' (se cortó: max_tokens)' : ''}`);
@@ -733,19 +750,24 @@ async function pensar({ chatId, mensaje, nombre = '', ahora = Date.now(), hasta 
  * Quién atiende la tanda de este chat: 'sonnet' (contesta Sonnet), 'sombra' (nadie contesta y Sonnet
  * piensa en sombra) o 'nadie' (no se llama a la API):
  *   - `apagado`: nadie, siempre. Es el interruptor general: ni la marca del chat lo prende.
- *   - `#bot <número>` dejó `atiendeSonnet: false`: sombra, en cualquier modo.
+ *   - `tester` (09/11/2026): Sonnet SOLO para NUMEROS_TESTER; todos los demás, nadie (se escucha y se guarda,
+ *     sin llamar a la API: ni sombra ni nada). Va ANTES de mirar las marcas del chat: un chat real que quedó
+ *     marcado `atiendeSonnet: true` de otra época no llama a Sonnet, ni `#sonnet-si` lo prende. En el tester,
+ *     `#bot` (marca `false`) lo deja en nadie.
+ *   - `#bot <número>` dejó `atiendeSonnet: false`: sombra, en cualquier otro modo.
  *   - `atiendeSonnet: true` (chat nuevo con `nuevos`, o `#sonnet-si`): Sonnet, aunque después se cambie el
- *     modo (también a `sombra`), hasta `#reset` o `#bot`. Solo `apagado` lo corta.
- *   - `todos`: Sonnet. `tester` y `nuevos`: Sonnet para NUMEROS_TESTER.
+ *     modo (también a `sombra`), hasta `#reset` o `#bot`. Solo `apagado` y `tester` lo cortan.
+ *   - `todos`: Sonnet. `nuevos`: Sonnet para NUMEROS_TESTER.
  *   - El resto: sombra (con `sombra`, todos menos los marcados).
  */
 function quienAtiende(chatId) {
   const modo = config.cerebro.modo;
   if (modo === 'apagado') return 'nadie';
   const s = state.todos()[chatId] || {};
+  if (modo === 'tester') return evolution.estaEnLaLista(chatId, config.numerosTester) && s.atiendeSonnet !== false ? 'sonnet' : 'nadie';
   if (s.atiendeSonnet === false) return 'sombra';
   if (s.atiendeSonnet === true || modo === 'todos') return 'sonnet';
-  if ((modo === 'tester' || modo === 'nuevos') && evolution.estaEnLaLista(chatId, config.numerosTester)) return 'sonnet';
+  if (modo === 'nuevos' && evolution.estaEnLaLista(chatId, config.numerosTester)) return 'sonnet';
   return 'sombra';
 }
 
@@ -773,12 +795,16 @@ function comoResultado(chatId, r, { nombre = '', ahora = Date.now() } = {}) {
   const apodo = salida.primerNombre(s.nombre) || salida.primerNombre(nombre);
   const cambios = { ultimaRespuestaSonnet: { ts: ahora, ...(r.escalar ? { escalo: r.motivo } : { mensajes: r.mensajes }) } };
   if (apodo && s.nombre !== apodo) cambios.nombre = apodo;
+  // La ficha del chat (qué pidió, en qué quedó): la arma el código con lo que cotizó y lo que se decidió.
+  cambios.ficha = ficha.armar(s, r, ahora);
   state.actualizar(chatId, cambios);
   const escala = (motivo) => ({ escalar: true, motivo, mensajes: [], callar: true, fuente: 'sonnet', sonnetMensajes: [] });
   if (r.escalar) return escala(r.motivo);
   const msgs = salida.sinLoYaDicho(chatId, r.mensajes || []);
   if (!msgs.length) return escala(salida.TODO_REPETIDO);
-  return { escalar: false, motivo: '', mensajes: msgs, callar: true, fuente: 'sonnet', sonnetMensajes: msgs.map(acciones.comoTexto) };
+  // `acciones`: lo que pidieron las herramientas (el catálogo, el seguimiento); index.js lo hace DESPUÉS de mandar
+  // los mensajes. Un turno que escala no deja ninguna.
+  return { escalar: false, motivo: '', mensajes: msgs, callar: true, fuente: 'sonnet', sonnetMensajes: msgs.map(acciones.comoTexto), acciones: r.acciones || {} };
 }
 
 /**
@@ -787,7 +813,8 @@ function comoResultado(chatId, r, { nombre = '', ahora = Date.now() } = {}) {
  * la tanda, ya bajadas (index.js, fotos-del-cliente.js).
  */
 async function contestar({ chatId, mensaje, nombre = '', ahora = Date.now(), audio = false, imagenes = [], fotos = null }) {
-  const r = await pensar({ chatId, mensaje, nombre, ahora, audio, imagenes, fotos });
+  // `enVivo`: lo único que habilita a las herramientas a dejar acciones pendientes (el catálogo, el seguimiento).
+  const r = await pensar({ chatId, mensaje, nombre, ahora, audio, imagenes, fotos, enVivo: true });
   if (r.error) return { r, error: r.error };
   return { r, resultado: comoResultado(chatId, r, { nombre, ahora }) };
 }

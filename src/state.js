@@ -739,6 +739,21 @@ function borrarGenerados(claves) {
 }
 
 /**
+ * La cola de avisos al grupo que se generaron afuera de la franja de AVISOS_HORA_DESDE a _HASTA (src/avisos-cola.js):
+ * `[{ id, ts, texto }]` bajo la clave interna. Sobrevive a un reinicio y #reset no la toca. Guarda YA: un aviso
+ * encolado no se puede perder con un corte.
+ */
+function colaAvisos() {
+  const c = interno().colaAvisos;
+  return Array.isArray(c) ? c : [];
+}
+
+function guardarColaAvisos(lista) {
+  interno().colaAvisos = lista;
+  guardarYa();
+}
+
+/**
  * El gasto de Sonnet del mes (bloque Ninjo 2, 06/10/2026): `{ mes: 'AAAA-MM', usd }`, el mes de
  * Argentina. Lo suma cerebro.js con cada llamada a la API (`sumarAlMes`), en el mismo lugar que el
  * gasto del día; /salud lo muestra. Bajo la clave interna: sobrevive a un reinicio y #reset no lo toca.
@@ -855,6 +870,8 @@ module.exports = {
   guardarExcluido,
   borrarExcluido,
   numerosExcluidos,
+  colaAvisos,
+  guardarColaAvisos,
   generados,
   guardarGenerado,
   borrarGenerados,

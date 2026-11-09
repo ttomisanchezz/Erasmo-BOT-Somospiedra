@@ -21,8 +21,9 @@ haya reglas aprobadas, **escala todo**. Lo de iPhone está en `_heredado-iphone/
 
 0. Preparar la base. Gate: Tomás escanea el QR del WhatsApp de Piedra. (Hecho.)
 1. Leer lo que ya existe: exportar el historial de Evolution y clasificarlo en lote (`herramientas/historial/`). (Hecho.)
-2. Escribir las reglas de Piedra (`reglas/cerebro-reglas-piedra.md`, cotización). Gate: Tomás las aprueba. (En curso.)
-3. Construir la v1 en modo borrador (herramientas `buscar_productos` / `cotizar` del cerebro: prompt 4).
+2. Escribir las reglas de Piedra (`reglas/cerebro-reglas-piedra.md`, cotización). Gate: Tomás las aprueba. (Hecho: aprobadas el 06/11/2026.)
+3. Construir la v1: las herramientas `buscar_productos`, `cotizar`, `mandar_catalogo` y `agendar_seguimiento` y el
+   **modo tester** (09/11/2026, "Erasmo en modo tester" más abajo). Cómo prenderlo: `PRENDER-TESTER.md`. (Hecho; falta probarlo.)
 4. Probar y salir en vivo. Gate: solo con la frase explícita de Tomás ("prendé pilotos" / "prendé para todos").
 5. Mejorar (opcional).
 
@@ -30,8 +31,8 @@ haya reglas aprobadas, **escala todo**. Lo de iPhone está en `_heredado-iphone/
 
 ## Reglas heredadas del sistema (valen siempre)
 
-- **Los montos nunca los produce la IA**: salen de una planilla o tabla y los calcula el código. Hoy no hay
-  herramientas de precio: la guardia frena **cualquier** monto que escriba Sonnet.
+- **Los montos nunca los produce la IA**: salen del panel (Supabase) o de la tabla de la granza y los calcula
+  el código (`cotizar`). La guardia frena **cualquier** monto que no haya devuelto `cotizar` en esa misma respuesta.
 - **Si no sabe cómo seguir: silencio con el cliente y aviso al grupo interno** (escalar).
 - **El bot nunca promete que otra persona va a contactar al cliente** (ni que va a volver a escribir).
 - **Tope de 4 mensajes por tanda, de 300 caracteres como máximo cada uno** (del 4º en adelante van juntos en el 4º).
@@ -44,7 +45,7 @@ No hay "bot de siempre" (el motor de reglas de iPhone, `responder.js`, quedó en
 |---|---|
 | `apagado` (default) | Nadie contesta. El bot escucha, guarda el historial y el registro de aprendizaje. Nunca llama a la API. Tampoco escala (ni un audio que no se entendió). |
 | `sombra` | Sonnet piensa con cada tanda y queda en el registro (`propuesta-sonnet`). No manda nada. |
-| `tester` | Sonnet le contesta a `NUMEROS_TESTER`; el resto, en sombra. |
+| `tester` | Sonnet le contesta **solo** a `NUMEROS_TESTER`; todos los demás: **nadie** (escucha y guarda, cero llamadas a la API; desde el 09/11/2026 ya no hay sombra acá, y ni una marca `atiendeSonnet` vieja lo cambia). |
 | `nuevos` | Al tester y a los chats nuevos (quedan marcados `atiendeSonnet` hasta `#reset` o `#bot`). |
 | `todos` | Sonnet le contesta a todos. |
 
@@ -55,7 +56,8 @@ llega al cliente" es `evolution.leLlegaAlCliente`.
 
 **Horario: el bot contesta las 24 horas** (decisión de Tomás, 29/10/2026): no hay franja horaria para los
 clientes. `SEGUIMIENTO_HORA_DESDE` / `_HASTA` solo rigen al guardián (cuándo mira que lleguen mensajes) y a los
-recordatorios internos del grupo.
+recordatorios internos del grupo. **Los avisos al grupo "Bot Erasmo" salen de 9 a 20** (`AVISOS_HORA_DESDE` /
+`_HASTA`, decisión de Tomás del 09/11/2026): ver `src/avisos-cola.js` más abajo.
 
 **Si Sonnet falla** (error de la API, timeout, sin `ANTHROPIC_API_KEY`) **no hay respaldo**: se escala en
 silencio ("Sonnet no pudo contestar (…)" en el 🔕 del grupo), sin callar el chat (el próximo mensaje se
@@ -65,31 +67,76 @@ vuelve a intentar). Lo prueba `test/piedra-sonnet.test.js`.
 
 - Sonnet termina siempre con `responder` (1 a 4 mensajes) o `escalar` (motivo para el grupo). Lo que no
   termina así cuenta como escalar.
-- `cerebro-reglas.md` es el **mínimo de Piedra**: asistente de Somos Piedra, no inventa precios,
-  condiciones, zonas, horarios ni políticas, no promete contacto de otra persona y **escala todo** salvo un
-  saludo o acuse trivial. Las reglas de verdad están en borrador en `reglas/cerebro-reglas-piedra.md`
-  (se copian acá cuando Tomás las apruebe). El hash de las reglas sale en `/salud` y en cada propuesta.
+- `cerebro-reglas.md` son las reglas **aprobadas por Tomás el 06/11/2026** (`reglas/cerebro-reglas-piedra.md`, v2),
+  adaptadas a lo que existe hoy: sin ningún monto escrito (los pone el código), y lo que todavía no hay
+  (simulador, fotos de las piedras, presupuesto en PDF, dólares, costo y zonas de envío) **escala**. Si se cambian
+  las de `reglas/`, hay que volver a adaptarlas acá. El hash de las reglas sale en `/salud` y en cada propuesta.
 - **La guardia** (`revisarSalida`): 4×300; cualquier monto que no devolvió una herramienta de ESTA
-  respuesta frena (un año suelto o la altura de una dirección no son montos); promesas
-  (`src/promesas.js`), "te falta", mandar algo después, archivos, nombres internos, marcas de IA y
-  caracteres raros. Si frena, Sonnet tiene **una** vuelta para corregir; si vuelve a frenar, escala.
+  respuesta frena (los montos van en pesos; un año suelto o la altura de una dirección no son montos); promesas
+  (`src/promesas.js`), "te falta", mandar algo después, archivos (**salvo el catálogo en PDF, y solo si
+  `mandar_catalogo` salió bien en ese turno**), nombres internos (también los de las herramientas nuevas), marcas
+  de IA y caracteres raros. Si frena, Sonnet tiene **una** vuelta para corregir; si vuelve a frenar, escala.
 - `armarContexto`: fecha de Neuquén, lo que sabe el estado, las líneas de una persona de la cuenta, las
   últimas 30 líneas del historial (completado con Evolution por `src/contexto.js`), la tanda y, en vivo,
   hasta 3 fotos del cliente. Sin el número del cliente; el nombre, tapado.
-- `HERRAMIENTAS_DE_DATOS` está **vacía**: ahí se conectan `buscar_productos` y `cotizar` de Piedra en el
-  prompt 4 (cada una: `definicion` para la API y `correr(input, turno)`, que anota en `turno.montos` los
-  montos que la guardia deja escribir).
+- `HERRAMIENTAS_DE_DATOS` = `src/herramientas-erasmo.js` (cada una: `definicion` para la API y
+  `correr(input, turno)`, que anota en `turno.montos` los montos que la guardia deja escribir, en pesos, y en
+  `turno.acciones` lo que hay que hacer cuando salgan los mensajes). `pensar` lleva `chatId` y `enVivo` en el turno
+  (solo `contestar` es en vivo) y devuelve `llamadas` (lo que pidió y devolvió cada herramienta, para `npm run pruebas`).
 - Gasto del día (memoria) y del mes (`estado.json`), aviso al 80% de `CEREBRO_TOPE_MES_USD`.
 
 ## Módulos de Piedra ya hechos (no se tocan sin decidir con Tomás)
 
-- `src/cotizador-piedra.js` (16/10/2026): dos precios por producto, **EFECTIVO** y **LISTA**. Efectivo
-  (efectivo, transferencia, Mercado Pago, QR) + **IVA 21 % sobre el efectivo si pide factura**; LISTA
-  (tarjeta, cheque, postnet) **ya es final**. Centavos enteros, sin flotantes. Lo que falta sale como
-  **FALTA DATO**. Test: `test/cotizador-piedra.test.js`.
+- `src/cotizador-piedra.js` (16/10/2026; cambiado el 09/11/2026): dos precios por producto, **EFECTIVO**
+  (efectivo, transferencia, Mercado Pago, QR) y **LISTA** (tarjeta, cheque, postnet). **Con factura, +21 % sobre la
+  columna que sea (también la lista)** (decisión del 30/10) y **redondeo para abajo a la centena de pesos en cada
+  total** (02/11); el orden: precio × cantidad → IVA → centena. Centavos enteros, sin flotantes. Lo que falta sale
+  como **FALTA DATO** (un total que da menos de $100 también). Unidades enteras: unidad, bolsa, bolsón, **caja,
+  malla**, litro. Test: `test/cotizador-piedra.test.js`.
 - `src/catalogo-piedra.js`: filas de la planilla a productos (pesos a centavos) y `buscarProductos`. Test:
   `test/catalogo-piedra.test.js`.
-- Todavía **no están conectados al cerebro**: eso es el prompt 4 (`buscar_productos`, `cotizar`).
+
+## Erasmo en modo tester (09/11/2026)
+
+Cómo prenderlo: `PRENDER-TESTER.md`. Qué revisar (cuentas y decisiones de plata): `REVISAR.md`, "Corrida 2026-11-09c".
+
+- `src/precios-panel.js`: los precios salen del panel (Supabase) con el usuario propio de Erasmo (`ERASMO_EMAIL` /
+  `ERASMO_PASSWORD`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`; rol `bot`, solo lectura). Pide `negocios` (slug
+  `somos-piedra`), `productos` y `plantas` con **columnas explícitas** (nunca `costo`), arma `nombre = planta +
+  presentación`, pasa los **centavos del panel a pesos** y los carga con `armarCatalogo`. Solo activos y en pesos; la
+  granza del panel se ignora. Caché en memoria de 10 min + copia en `data/precios/panel-cache.json`; si Supabase
+  falla, la última copia buena (con un respiro de 60 s sin volver a pedir); si nunca cargó, FALTA DATO. Con filas de
+  más de un negocio, todo FALTA DATO. Test: `test/precios-panel.test.js` (Supabase de mentira).
+- `src/granza.js`: la granza NO está en el panel: tabla de tramos en un solo lugar (por bolsa: efectivo $22.000 /
+  $20.000 / $15.000, tarjeta $27.000 / $25.000 / $19.000; **supuesto**: tramos de 1 a 9, 10 a 19 y desde 20 bolsas),
+  por m², 1 bolsa = 1 m² a 3 cm, nunca por bolsón. Test: `test/granza.test.js`.
+- `src/herramientas-erasmo.js`: `buscar_productos` (nombres exactos, sin precios), `cotizar` (producto exacto + m² /
+  largo y ancho / cantidad, forma de pago, con o sin factura → los totales ya escritos; tarjeta un solo pago; sin
+  cuotas, cheque, pago mixto ni dólares; más de 100 m² escala; la multiplicación de largo × ancho la hace el
+  código), `mandar_catalogo` y `agendar_seguimiento`. **Las dos últimas no hacen nada en el acto**: anotan en
+  `turno.acciones` y `index.js` las ejecuta DESPUÉS de mandar los textos (y solo si el turno no escaló).
+- **Catálogo PDF** (`mandar_catalogo`): `documentos/Catalogo-Somos-Piedra-2026_3.pdf` (carpeta fuera de git), por
+  `src/documentos.js`. Sale por `mandarCatalogo` de `index.js`: "escribiendo…", ritmo, control (pausa, escalado, una
+  persona, mensaje nuevo) y `enviarAlCliente` (el eco del PDF no cuenta como una persona de la cuenta), con los
+  candados de `evolution.enviarDocumento` (escucha, **borrador** —nuevo—, listas, excluidos, carpeta). Una vez por
+  chat cada 24 h (`catalogoEnviado`) salvo que lo pida de nuevo. En borrador, el borrador al grupo dice "[+ catálogo en PDF]".
+- **Seguimiento** (`src/seguimiento.js`): `agendar_seguimiento` (fecha AAAA-MM-DD posterior a hoy y hasta 180 días,
+  más el motivo) queda en `s.seguimiento` cuando salió la respuesta; ese día, al abrir la franja de avisos (9),
+  **un** aviso al grupo (quién, qué pidió, por qué volver). No usa `recordatorios.js`. Nunca le escribe al cliente.
+- **Avisos al grupo de 9 a 20** (`src/avisos-cola.js`): `evolution.avisarGrupo` encola en `estado.json` (clave
+  interna, `colaAvisos`, tope 200) lo que se genera afuera de la franja (hora de Argentina) y un barrido de 1 minuto lo
+  manda junto, en un solo mensaje (o los mínimos), y lo saca de la cola solo después de que salió. `avisarGrupo(texto,
+  { inmediato: true })` sale ya: respuestas a comandos del grupo (`#excluir`, `#pausa`, `#vendido`, `#sonnet`…),
+  el guardián y el estado dañado. Los escalamientos siguen siendo callados para el cliente.
+- **Ficha** (`src/ficha.js`): en `s.ficha`, armada por el código: de qué anuncio vino, qué pidió (lo último cotizado),
+  su último mensaje, en qué quedó, seguimiento y catálogo enviado.
+- `quienAtiende` con `tester`: el que no está en `NUMEROS_TESTER` es `nadie`, antes de mirar `atiendeSonnet`.
+- `npm run grupos` (`herramientas/grupos/listar.js`): lista nombre + JID de los grupos de la instancia (solo lee; no
+  imprime claves). `npm run pruebas -- 5492994295806` (`herramientas/pruebas/armar.js`): arma `data/pruebas/<fecha>.md`
+  con la charla del tester (tandas, herramientas con montos, escaladas, frenos de la guardia); solo lee.
+- Tests: `granza`, `precios-panel`, `grupos`, `erasmo-herramientas`, `erasmo-tester` (modo tester, catálogo,
+  seguimiento, cola de avisos, candados) y `pruebas`. `test/piedra-ayuda.js` fija la franja de avisos de 0 a 24 y el
+  caché de precios en la carpeta temporal.
 
 ## Archivos que genera el bot (`src/generados.js`, 29/10/2026)
 
@@ -177,18 +224,22 @@ local). **Desde el celular del tester**: `#reset`. Cada comando contesta en el g
 escribe mal (no hay un `#ayuda` central: cada módulo tiene su `COMO_SE_USA`).
 
 **npm**: `npm start`; `npm test` (la suite: ver `package.json`; si tarda, archivo por archivo con
-`node test/<archivo>.test.js`); `npm run evaluar -- --offline` (10 casos de Piedra con Sonnet enlatado: tiene
+`node test/<archivo>.test.js`); `npm run grupos` (ids de los grupos de la instancia); `npm run pruebas -- 549…`
+(la charla del tester en `data/pruebas/`); `npm run evaluar -- --offline` (18 casos de Piedra con Sonnet enlatado: tiene
 que dar 100%); `npm run aprender`; `npm run destino` (a dónde van los avisos); `npm run sembrar-viejos`
 (semilla de chats viejos, con el bot frenado); `npm run probar-contexto -- 549…`.
 
 ## Variables de entorno
 
 Todas en `src/config.js`; `.env.example` va siempre con los valores vacíos. No se lee ni se toca `.env`.
-El bot **no necesita** `credenciales.json` ni variables de Supabase o de la planilla para arrancar (ya no
-existen). Las importantes: `EVOLUTION_INSTANCE` (obligatoria), `EVOLUTION_APIKEY`, `PORT` (3002),
+El bot **no necesita** `credenciales.json` ni la planilla para arrancar (ya no existen); las variables de
+Supabase (abajo) solo son para los precios: sin ellas no hay precios del panel y Erasmo escala todo menos la
+granza. Las importantes: `EVOLUTION_INSTANCE` (obligatoria), `EVOLUTION_APIKEY`, `PORT` (3002),
 `WEBHOOK_SECRETO`, `GRUPO_AVISOS_JID`, `CEREBRO_MODO`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` (solo
 audios), `MODO_ESCUCHA`, `MODO_BORRADOR`, `NUMEROS_TESTER`, `NUMEROS_PILOTO`, `CONTACTOS_PERSONALES`,
-`GENERADOS_DIR` (vacía: `data/generados`).
+`GENERADOS_DIR` (vacía: `data/generados`). Nuevas del 09/11/2026: `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
+`ERASMO_EMAIL`, `ERASMO_PASSWORD` (los precios del panel), `PRECIOS_CACHE_PATH` (vacía: `data/precios/panel-cache.json`),
+`AVISOS_HORA_DESDE` / `AVISOS_HORA_HASTA` (9 y 20). Ojo: `MODO_BORRADOR` vale `true` si falta en el `.env`.
 
 ## Tests
 
@@ -206,10 +257,12 @@ audios), `MODO_ESCUCHA`, `MODO_BORRADOR`, `NUMEROS_TESTER`, `NUMEROS_PILOTO`, `C
 
 | Carpeta | Qué hay |
 |---|---|
-| `src/` | El bot: `index.js` (webhook, tandas, comandos, barridos), `cerebro.js` + `cerebro-reglas.md`, `config.js`, `state.js`, `evolution.js`, `control.js`, `contexto.js`, `audio.js` + `gemini.js`, `guardian.js`, `chats-viejos.js`, `autoria.js`, `aprendizaje.js`, `sombra-persona.js`, `cerebro-comandos.js`, `interruptor.js`, `promesas.js`, `recordatorios.js`, `ventas.js`, `excluidos.js`, `generados.js`, `salida.js`, `avisos-texto.js`, y los de Piedra `cotizador-piedra.js` y `catalogo-piedra.js`. |
+| `src/` | El bot: `index.js` (webhook, tandas, comandos, barridos), `cerebro.js` + `cerebro-reglas.md`, `config.js`, `state.js`, `evolution.js`, `control.js`, `contexto.js`, `audio.js` + `gemini.js`, `guardian.js`, `chats-viejos.js`, `autoria.js`, `aprendizaje.js`, `sombra-persona.js`, `cerebro-comandos.js`, `interruptor.js`, `promesas.js`, `recordatorios.js`, `ventas.js`, `excluidos.js`, `generados.js`, `salida.js`, `avisos-texto.js`, los de Piedra `cotizador-piedra.js` y `catalogo-piedra.js`, y los del modo tester (09/11): `precios-panel.js`, `granza.js`, `herramientas-erasmo.js`, `avisos-cola.js`, `seguimiento.js` y `ficha.js`. |
 | `test/` | Los tests y los scripts (`evaluar.js`, `aprender.js`, `destino.js`, `sembrar-viejos.js`, `probar-contexto.js`). |
-| `reglas/` | Reglas y casos de Piedra en borrador (Etapa 2). |
+| `reglas/` | Reglas y casos de Piedra (Etapa 2; las reglas del cerebro, aprobadas el 06/11, están copiadas y adaptadas en `src/cerebro-reglas.md`). |
 | `herramientas/historial/` | Exportador y clasificador del historial de Evolution (Etapa 1). |
+| `herramientas/grupos/`, `herramientas/pruebas/` | `npm run grupos` (ids de grupos) y `npm run pruebas` (la charla del tester en `data/pruebas/`). |
+| `documentos/` | El catálogo en PDF que manda `mandar_catalogo` (no se versiona: se copia a mano). |
 | `bot/` | Prompts para VS Code y `mapa-poda.md` (qué se conservó, adaptó y movió en la poda). |
 | `claude/` | Traspasos de cada chat (el de fecha más nueva manda). |
 | `data/` | Estado, registro de aprendizaje, precios y los archivos que genera el bot (`data/generados/`) (no se versiona). |
@@ -218,7 +271,8 @@ audios), `MODO_ESCUCHA`, `MODO_BORRADOR`, `NUMEROS_TESTER`, `NUMEROS_PILOTO`, `C
 ## Pendientes de decisión (Tomás)
 
 - Saludo automático del día (se fue con `responder.js`): hoy no hay; lo decide Tomás.
-- Seguimiento automático y resumen de la mañana: se fueron (eran de iPhone); si se quieren para Piedra, se diseñan de nuevo.
+- Resumen de la mañana: se fue (era de iPhone); si se quiere para Piedra, se diseña de nuevo. (El seguimiento ya está: Erasmo anota "volver a contactar el día X" y ese día sale un aviso al grupo; no le escribe al cliente cada 2 días.)
+- Tramos de la granza (supuesto 1-9 / 10-19 / 20+; 19 bolsas salen más caras que 20), tope de antigüedad de la copia de precios, y si Erasmo confirma las zonas de envío de la ronda 2 (hoy escala): ver `REVISAR.md`.
 - Las 5 preguntas de precios del traspaso del 16/10 y las de `preguntas-para-fran-v2.md`.
 - Cuánto se guardan los archivos de `data/generados/` (spec del simulador §12.4): hoy no se borra nada.
 - Conectar `enviarGenerado` al cerebro (`simular_piedra`, `presupuesto_pdf`): fase F2 de la spec del simulador.

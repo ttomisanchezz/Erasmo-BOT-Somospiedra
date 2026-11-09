@@ -140,6 +140,28 @@ module.exports = {
   // JID del grupo interno donde llegan los avisos. Formato: 1203...@g.us
   grupoAvisos: process.env.GRUPO_AVISOS_JID || '',
 
+  // Los avisos al grupo "Bot Erasmo" salen de AVISOS_HORA_DESDE a AVISOS_HORA_HASTA (hora de Argentina; 9 a 20,
+  // decisión de Tomás del 09/11/2026). Los que se generan afuera de la franja se juntan (estado.json) y salen
+  // juntos, en un solo mensaje, cuando abre. Erasmo le contesta a los clientes las 24 h: esto es solo del grupo.
+  avisos: {
+    horaDesde: parseInt(process.env.AVISOS_HORA_DESDE || '9', 10),
+    horaHasta: parseInt(process.env.AVISOS_HORA_HASTA || '20', 10),
+  },
+
+  // PRECIOS DEL PANEL (Supabase): Erasmo entra con su propio usuario (rol `bot`, solo lectura de `productos` y
+  // `plantas` de su negocio) y lee los precios de Somos Piedra. Sin estas cuatro variables no hay precios: todo
+  // es FALTA DATO y Erasmo escala. Ver src/precios-panel.js. El caché en disco es la última copia buena.
+  panel: {
+    supabaseUrl: opt('SUPABASE_URL').replace(/\/+$/, ''),
+    anonKey: opt('SUPABASE_ANON_KEY'),
+    email: opt('ERASMO_EMAIL'),
+    password: opt('ERASMO_PASSWORD'),
+    slug: 'somos-piedra',
+    cachePath: process.env.PRECIOS_CACHE_PATH || path.join(__dirname, '..', 'data', 'precios', 'panel-cache.json'),
+    ttlMs: 10 * 60 * 1000,
+    timeoutMs: parseInt(process.env.PANEL_TIMEOUT_MS || '8000', 10) || 8000,
+  },
+
   // Ritmo humano: el bot nunca contesta al instante.
   ritmo: {
     esperaMinMs: parseInt(process.env.ESPERA_MIN_MS || '20000', 10),

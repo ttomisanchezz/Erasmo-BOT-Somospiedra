@@ -55,6 +55,9 @@ function activa(ahora = Date.now()) {
   const hasta = config.cerebro.sombraPersonaHasta;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(hasta || '')) return false;
   if (config.cerebro.modo === 'apagado' || config.modoEscucha) return false;
+  // Modo tester (09/11/2026): solo el número tester llama a la API. Esta sombra piensa en chats REALES que atiende
+  // una persona: acá no corre, aunque CEREBRO_SOMBRA_PERSONA_HASTA tenga una fecha en el .env.
+  if (config.cerebro.modo === 'tester') return false;
   if (!interruptor.prendida()) return false;
   return diaDe(ahora) <= hasta;
 }
