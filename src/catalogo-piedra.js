@@ -20,6 +20,7 @@ const UNIDADES = {
   kg: 'kg', kilo: 'kg', kilos: 'kg',
   unidad: 'unidad', unidades: 'unidad', u: 'unidad', un: 'unidad', unid: 'unidad',
   bolsa: 'bolsa', bolsas: 'bolsa', bolson: 'bolson', bolsones: 'bolson',
+  caja: 'caja', cajas: 'caja', malla: 'malla', mallas: 'malla',
   litro: 'litro', litros: 'litro', lt: 'litro', l: 'litro',
 };
 

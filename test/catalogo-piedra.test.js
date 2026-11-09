@@ -63,7 +63,8 @@ caso('unidad: sinonimos conocidos; lo desconocido no se adivina', () => {
   assert.strictEqual(u('Bolsón'), 'bolson');
   assert.strictEqual(u('unidad'), 'unidad');
   assert.strictEqual(u('ml'), undefined);
-  assert.strictEqual(u('caja'), undefined);
+  assert.strictEqual(u('caja'), 'caja'); // el panel tiene caja y malla (cobertura en m2)
+  assert.strictEqual(u('pallet'), undefined);
 });
 
 caso('cobertura y tramos se pasan al cotizador', () => {

@@ -2,9 +2,10 @@
 /**
  * Cotizador de Somos Piedra: dos precios por producto (EFECTIVO y PRECIO LISTA).
  * Productos y precios INVENTADOS: ningun precio real de Piedra va en los tests.
- * Decisiones de Tomas (16/10/2026):
- *  - EFECTIVO: efectivo, transferencia, Mercado Pago y QR. Con factura se suma el 21 % de IVA.
- *  - LISTA: tarjeta (debito o credito), cheque y postnet. Ya es el precio final con factura.
+ * Decisiones de Tomas (16/10/2026, cambiadas el 30/10 y el 02/11; confirmadas el 09/11/2026):
+ *  - EFECTIVO: efectivo, transferencia, Mercado Pago y QR. LISTA: tarjeta, cheque y postnet.
+ *  - CON FACTURA se suma el 21 % de IVA al precio que sea, efectivo O lista (30/10).
+ *  - Redondeo siempre para abajo a la centena de pesos, en cada total (02/11).
  *  - Si no dicen como pagan, el bot dice el de efectivo (y aclara que con tarjeta es otro).
  */
 const assert = require('assert');
@@ -43,11 +44,8 @@ caso('12 m2 de laja: efectivo, efectivo con factura y lista', () => {
   assert.strictEqual(r.cantidad, '12.00');
   assert.strictEqual(r.efectivo.totalCentavos, 60000000);           // $600.000
   assert.strictEqual(r.efectivo.conFactura.totalCentavos, 72600000); // $726.000
-  assert.strictEqual(r.efectivo.conFactura.netoCentavos, 60000000);
-  assert.strictEqual(r.efectivo.conFactura.ivaCentavos, 12600000);
-  assert.strictEqual(r.lista.totalCentavos, 72000000);               // $720.000, ya con factura
-  assert.strictEqual(r.lista.netoCentavos, 59504132);
-  assert.strictEqual(r.lista.ivaCentavos, 12495868);
+  assert.strictEqual(r.lista.totalCentavos, 72000000);               // $720.000 sin factura
+  assert.strictEqual(r.lista.conFactura.totalCentavos, 87120000);    // $871.200: el 21 % tambien sobre la lista
   assert.strictEqual(r.porDefecto, 'efectivo');
 });
 
@@ -162,7 +160,11 @@ caso('columna por medio de pago', () => {
 caso('con medio: elegido apunta a la columna correcta', () => {
   const r = c.cotizar({ producto: laja, m2: 1, config: CONFIG, medio: 'credito' });
   assert.strictEqual(r.elegido.columna, 'lista');
+  assert.strictEqual(r.elegido.factura, false);
   assert.strictEqual(r.elegido.totalCentavos, 6000000);
+  const l = c.cotizar({ producto: laja, m2: 1, config: CONFIG, medio: 'credito', factura: true });
+  assert.strictEqual(l.elegido.factura, true);
+  assert.strictEqual(l.elegido.totalCentavos, 7260000); // 60.000 + 21 %
   const t = c.cotizar({ producto: laja, m2: 1, config: CONFIG, medio: 'transferencia', factura: true });
   assert.strictEqual(t.elegido.columna, 'efectivo');
   assert.strictEqual(t.elegido.totalCentavos, 6050000); // 50.000 + 21 %
@@ -189,11 +191,44 @@ caso('cuotas con un medio que no es tarjeta -> error', () => {
   assert.strictEqual(r.error, 'cuotas_solo_con_tarjeta');
 });
 
-caso('IVA redondea al centavo mas cercano (mitad para arriba)', () => {
+caso('redondeo: siempre para abajo a la centena de pesos, en cada total (10.550 -> 10.500)', () => {
+  const p = { nombre: 'X', unidad: 'unidad', efectivoCentavos: 1055000, listaCentavos: 1199900 };
+  const r = c.cotizar({ producto: p, cantidad: 1, config: CONFIG });
+  assert.strictEqual(r.efectivo.totalCentavos, 1050000);              // 10.550 -> 10.500
+  assert.strictEqual(r.efectivo.conFactura.totalCentavos, 1270000);   // 10.550 x 1,21 = 12.765,5 -> 12.700
+  assert.strictEqual(r.lista.totalCentavos, 1190000);                 // 11.999 -> 11.900
+  assert.strictEqual(r.lista.conFactura.totalCentavos, 1450000);      // 11.999 x 1,21 = 14.518,79 -> 14.500
+});
+
+caso('el redondeo sale de la cuenta exacta: nunca sube un total y los centavos no cuentan', () => {
   const p = { nombre: 'X', unidad: 'unidad', efectivoCentavos: 3333333, listaCentavos: 4000000 };
   const r = c.cotizar({ producto: p, cantidad: 1, config: CONFIG });
-  assert.strictEqual(r.efectivo.conFactura.totalCentavos, 4033333);
-  assert.strictEqual(r.efectivo.conFactura.ivaCentavos, 700000);
+  assert.strictEqual(r.efectivo.totalCentavos, 3330000);              // 33.333,33 -> 33.300
+  assert.strictEqual(r.efectivo.conFactura.totalCentavos, 4030000);   // 40.333,33 -> 40.300
+  assert.strictEqual(r.lista.conFactura.totalCentavos, 4840000);      // 40.000 x 1,21 = 48.400 justo
+  for (const col of [r.efectivo, r.lista]) {
+    assert.strictEqual(col.totalCentavos % 10000, 0);
+    assert.strictEqual(col.conFactura.totalCentavos % 10000, 0);
+  }
+});
+
+caso('un total que queda en cero al redondear no es un monto: FALTA DATO', () => {
+  const p = { nombre: 'X', unidad: 'unidad', efectivoCentavos: 9000, listaCentavos: 9500 };
+  const r = c.cotizar({ producto: p, cantidad: 1, config: CONFIG });
+  assert.strictEqual(r.ok, false);
+  assert.ok(r.faltaDato.includes('total_menor_a_una_centena'));
+});
+
+caso('caja y malla: unidades enteras con cobertura en m2', () => {
+  const caja = { nombre: 'Laja en caja', unidad: 'caja', coberturaM2: '0.5', efectivoCentavos: 3000000, listaCentavos: 3600000 };
+  const r = c.cotizar({ producto: caja, m2: 3, config: CONFIG });
+  assert.strictEqual(r.ok, true, JSON.stringify(r));
+  assert.strictEqual(r.cantidad, '6');
+  assert.strictEqual(r.m2Cubiertos, '3.00');
+  assert.strictEqual(r.efectivo.totalCentavos, 18000000);
+  const malla = { nombre: 'Malla', unidad: 'malla', efectivoCentavos: 1000000, listaCentavos: 1200000 };
+  assert.deepStrictEqual(c.cotizar({ producto: malla, m2: 2, config: CONFIG }).faltaDato, ['coberturaM2']);
+  assert.strictEqual(c.cotizar({ producto: malla, cantidad: 3, config: CONFIG }).efectivo.totalCentavos, 3000000);
 });
 
 caso('formatear pesos', () => {

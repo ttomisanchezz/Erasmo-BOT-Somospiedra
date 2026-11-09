@@ -3,21 +3,24 @@
  * Cotizador de Somos Piedra. Modulo puro: sin red, sin disco, sin fechas, sin otros archivos del repo.
  * Los montos los calcula este codigo, nunca la IA. Plata en centavos enteros (BigInt adentro).
  *
- * Reglas (Tomas, 16/10/2026):
+ * Reglas (Tomas, 16/10/2026; cambiadas el 30/10 y el 02/11, y confirmadas el 09/11/2026):
  *  - Cada producto tiene dos precios: EFECTIVO y PRECIO LISTA (por unidad de venta).
- *  - EFECTIVO: efectivo, transferencia, Mercado Pago y QR. Sin factura es ese precio; con factura, + 21 % de IVA.
- *  - LISTA: tarjeta (debito o credito), cheque y postnet. Ya es el precio final con factura (IVA incluido).
+ *  - EFECTIVO: efectivo, transferencia, Mercado Pago y QR. LISTA: tarjeta (un solo pago), cheque y postnet.
+ *  - Sin factura se cobra ese precio. CON FACTURA se suma el 21 % de IVA al precio que sea, efectivo O lista
+ *    (decision del 30/10: manda lo que dijo Fran; la regla del 16/10, "la lista ya es final", quedo vieja).
+ *  - Redondeo (02/11): SIEMPRE para abajo, a la centena de pesos (10.550 -> 10.500), en cada total que se muestra.
+ *  - Orden de la cuenta: precio x cantidad -> + 21 % si hay factura -> para abajo a la centena.
  *  - Si no dicen como pagan: el de efectivo (el bot aclara que con tarjeta es otro).
  *  - Lo que falta es FALTA DATO y no sale ningun monto que dependa de eso.
  *
  * API
  *  cotizar({ producto, m2?, cantidad?, config, medio?, factura?, cuotas? }) ->
  *    { ok, error?, faltaDato: [], supuestos: [], unidad, cantidad: '13.20' | '83', m2Cubiertos?,
- *      efectivo: { ok, totalCentavos, conFactura: { totalCentavos, netoCentavos, ivaCentavos } } | { ok:false, faltaDato },
- *      lista:    { ok, totalCentavos, netoCentavos, ivaCentavos } | { ok:false, faltaDato },
+ *      efectivo: { ok, totalCentavos, conFactura: { totalCentavos } } | { ok:false, faltaDato },
+ *      lista:    { ok, totalCentavos, conFactura: { totalCentavos } } | { ok:false, faltaDato },
  *      porDefecto: 'efectivo',
  *      elegido:  { ok, columna, factura, totalCentavos } | { ok:false, columna, faltaDato } }
- *  producto: { nombre, unidad: 'm2'|'metro'|'m3'|'kg'|'unidad'|'bolsa'|'bolson'|'litro',
+ *  producto: { nombre, unidad: 'm2'|'metro'|'m3'|'kg'|'unidad'|'bolsa'|'bolson'|'caja'|'malla'|'litro',
  *              efectivoCentavos?, listaCentavos?, coberturaM2? (m2 que cubre una unidad entera),
  *              tramos?: [{ cantidad, efectivoCentavos, listaCentavos }] (precio del tramo entero) }
  *  config:   { desperdicioPct } (obligatorio si el pedido viene en m2 y no es por tramos; 0 es valido si se carga)
@@ -25,8 +28,10 @@
  */
 
 const FRACCIONABLES = new Set(['m2', 'metro', 'm3', 'kg']);
-const ENTERAS = new Set(['unidad', 'bolsa', 'bolson', 'litro']);
+const ENTERAS = new Set(['unidad', 'bolsa', 'bolson', 'caja', 'malla', 'litro']);
 const IVA_PCT = 21n;
+/** La centena de pesos, en centavos: el redondeo siempre es para abajo a un multiplo de esto. */
+const CENTENA = 10000n;
 
 const MEDIOS = {
   efectivo: 'efectivo', transferencia: 'efectivo', mercadopago: 'efectivo', qr: 'efectivo',
@@ -41,7 +46,6 @@ function columnaPorMedio(medio) {
 }
 
 // --- aritmetica entera ---
-const halfUp = (num, den) => (num * 2n + den) / (2n * den);
 const ceilDiv = (a, b) => (a + b - 1n) / b;
 
 /** Numero o texto ("12,5") -> entero escalado a `dec` decimales, redondeando para arriba. null si no sirve. */
@@ -72,24 +76,25 @@ function formatearPesos(centavos) {
   return (neg ? '-' : '') + '$' + pesos + (cent ? ',' + cent.toString().padStart(2, '0') : '');
 }
 
-function columnaEfectivo(totalUnit, mult) {
-  // mult: funcion precio -> total en centavos (BigInt)
-  if (!precioValido(totalUnit)) return { ok: false, faltaDato: ['efectivoCentavos'] };
-  const t = mult(BigInt(totalUnit));
-  const conIva = halfUp(t * (100n + IVA_PCT), 100n);
-  return {
-    ok: true,
-    totalCentavos: Number(t),
-    conFactura: { totalCentavos: Number(conIva), netoCentavos: Number(t), ivaCentavos: Number(conIva - t) },
-  };
-}
+/** Para abajo a la centena de pesos (en centavos). */
+const aLaCentena = (centavos) => (centavos / CENTENA) * CENTENA;
 
-function columnaLista(totalUnit, mult) {
-  if (!precioValido(totalUnit)) return { ok: false, faltaDato: ['listaCentavos'] };
-  const t = mult(BigInt(totalUnit));
-  const neto = halfUp(t * 100n, 100n + IVA_PCT);
-  return { ok: true, totalCentavos: Number(t), netoCentavos: Number(neto), ivaCentavos: Number(t - neto) };
+/**
+ * Una columna de precio (efectivo o lista): el total sin factura y el total con factura (+ 21 %), cada uno
+ * redondeado para abajo a la centena DESDE la cuenta exacta (no se redondea dos veces). Un total que queda
+ * en cero (un producto de menos de $100) no es un monto: FALTA DATO.
+ */
+function unaColumna(precioUnit, mult, faltante) {
+  // mult: funcion precio -> total en centavos (BigInt)
+  if (!precioValido(precioUnit)) return { ok: false, faltaDato: [faltante] };
+  const t = mult(BigInt(precioUnit));
+  const sinFactura = aLaCentena(t);
+  const conFactura = ((t * (100n + IVA_PCT)) / 100n / CENTENA) * CENTENA;
+  if (sinFactura <= 0n) return { ok: false, faltaDato: ['total_menor_a_una_centena'] };
+  return { ok: true, totalCentavos: Number(sinFactura), conFactura: { totalCentavos: Number(conFactura) } };
 }
+const columnaEfectivo = (precioUnit, mult) => unaColumna(precioUnit, mult, 'efectivoCentavos');
+const columnaLista = (precioUnit, mult) => unaColumna(precioUnit, mult, 'listaCentavos');
 
 function cotizar(args) {
   const { producto, m2, cantidad, config = {}, medio, factura = false, cuotas } = args || {};
@@ -136,7 +141,7 @@ function cotizar(args) {
       const conDesp = ceilDiv(pedido * (10000n + bp), 10000n); // centesimos de m2
       if (unidad === 'm2') {
         out.cantidad = conDec(conDesp, 2);
-        mult = (p) => halfUp(p * conDesp, 100n);
+        mult = (p) => (p * conDesp) / 100n; // al centavo, para abajo: nunca sube un total
       } else if (ENTERAS.has(unidad)) {
         const cob = aEscala(producto.coberturaM2, 4); // diezmilesimos de m2
         if (cob === null || cob <= 0n) { out.faltaDato.push('coberturaM2'); return out; }
@@ -155,7 +160,7 @@ function cotizar(args) {
       mult = (p) => p * unidades;
     } else {
       out.cantidad = conDec(pedido, 2);
-      mult = (p) => halfUp(p * pedido, 100n);
+      mult = (p) => (p * pedido) / 100n;
     }
     efectivo = columnaEfectivo(producto.efectivoCentavos, mult);
     lista = columnaLista(producto.listaCentavos, mult);
@@ -176,11 +181,10 @@ function cotizar(args) {
   const col = columna === 'lista' ? lista : efectivo;
   if (!col.ok) out.elegido = { ok: false, columna, faltaDato: col.faltaDato };
   else if (nCuotas > 1) out.elegido = { ok: false, columna, faltaDato: ['recargo_cuotas'] };
-  else if (columna === 'efectivo') {
+  else {
+    // Con factura, +21 % sobre la columna que sea (efectivo o lista).
     out.elegido = { ok: true, columna, factura: !!factura,
       totalCentavos: factura ? col.conFactura.totalCentavos : col.totalCentavos };
-  } else {
-    out.elegido = { ok: true, columna, factura: true, totalCentavos: col.totalCentavos };
   }
   return out;
 }
