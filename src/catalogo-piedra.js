@@ -11,6 +11,7 @@
  *    filas: objetos con encabezados libres: PRODUCTO|NOMBRE, EFECTIVO, PRECIO LISTA|LISTA, UNIDAD, COBERTURA M2, TRAMO.
  *    Filas con el mismo producto y TRAMO se juntan en `tramos` (precio del tramo entero).
  *  buscarProductos(catalogo, consulta, { max = 5 }) -> [{ nombre, unidad, tienePrecio, puntaje }] (sin montos).
+ *    Singular y plural dan lo mismo: "adoquines" encuentra "Adoquin" y al reves.
  */
 
 const UNIDADES = {
@@ -134,6 +135,14 @@ function armarCatalogo(filas) {
   return { productos, problemas };
 }
 
+/** La palabra y sus singulares posibles ("adoquines" -> adoquines, adoquine, adoquin), con 3 letras o mas. */
+function formas(w) {
+  const f = [w];
+  if (w.endsWith('s') && w.length >= 4) f.push(w.slice(0, -1));
+  if (w.endsWith('es') && w.length >= 5) f.push(w.slice(0, -2));
+  return f;
+}
+
 function buscarProductos(catalogo, consulta, { max = 5 } = {}) {
   const pedidas = palabras(consulta || '').filter((w) => !PARADAS.has(w));
   if (!pedidas.length) return [];
@@ -142,7 +151,8 @@ function buscarProductos(catalogo, consulta, { max = 5 } = {}) {
     const suyas = palabras(p.nombre);
     let puntaje = 0;
     for (const w of pedidas) {
-      if (suyas.some((s) => s === w || (w.length >= 3 && s.startsWith(w)))) puntaje++;
+      const formasW = formas(w);
+      if (suyas.some((s) => s === w || (w.length >= 3 && s.startsWith(w)) || formas(s).some((f) => formasW.includes(f)))) puntaje++;
     }
     if (puntaje) {
       const tienePrecio = Boolean(p.efectivoCentavos || p.listaCentavos || (p.tramos || []).some((t) => t.efectivoCentavos || t.listaCentavos));

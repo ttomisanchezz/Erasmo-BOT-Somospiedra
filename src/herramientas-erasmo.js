@@ -293,7 +293,7 @@ const COTIZAR = {
           }
         : {}),
       aviso:
-        'Decí cuánto es y si es con o sin factura. ' +
+        (factura ? 'Decí cuánto es y que es con factura. ' : 'Decí cuánto es; no escribas "sin factura": cerrá con "🧾 + IVA si necesitás factura". ') +
         (forma ? '' : 'Si el cliente todavía no dijo cómo paga, da los dos totales. ') +
         'El precio de una unidad solo si el cliente lo pidió. No sumes ni restes nada vos.',
     };

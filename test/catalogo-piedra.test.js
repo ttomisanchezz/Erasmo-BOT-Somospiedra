@@ -105,6 +105,28 @@ caso('buscar: sin acentos, sin mayusculas, por palabras, mejor primero', () => {
   assert.strictEqual(cat.buscarProductos(c, 'granza', { max: 1 }).length, 1);
 });
 
+caso('buscar: singular y plural dan lo mismo ("adoquines" encuentra "Adoquin", "pizarras" encuentra "Pizarra")', () => {
+  const c = cat.armarCatalogo([
+    { producto: 'Adoquines Ojito', efectivo: 1, lista: 1 },
+    { producto: 'Micosa Adoquin 10X10', efectivo: 1, lista: 1 },
+    { producto: 'Porfido Adoquin 10X10', efectivo: 1, lista: 1 },
+    { producto: 'Pizarra Negra 30 Cm', efectivo: 1, lista: 1 },
+    { producto: 'Granza gris', efectivo: 1, lista: 1 },
+    { producto: 'Baldosa 40X40 Vainilla', efectivo: 1, lista: 1 },
+  ]);
+  const nombres = (q) => cat.buscarProductos(c, q).map((x) => x.nombre);
+  const adoquines = ['Adoquines Ojito', 'Micosa Adoquin 10X10', 'Porfido Adoquin 10X10'];
+  assert.deepStrictEqual(nombres('adoquines'), adoquines);
+  assert.deepStrictEqual(nombres('adoquin'), adoquines);
+  assert.deepStrictEqual(nombres('adoquínes micosa'), ['Micosa Adoquin 10X10', 'Adoquines Ojito', 'Porfido Adoquin 10X10']);
+  assert.deepStrictEqual(nombres('pizarras negras'), ['Pizarra Negra 30 Cm']);
+  assert.deepStrictEqual(nombres('granza grises'), ['Granza gris']);
+  assert.deepStrictEqual(nombres('baldosas'), ['Baldosa 40X40 Vainilla']);
+  // No se pasa de largo: una palabra corta o distinta no engancha por la "s".
+  assert.deepStrictEqual(nombres('es'), []);
+  assert.deepStrictEqual(nombres('gres'), []);
+});
+
 caso('buscar no devuelve precios (los montos salen solo de cotizar)', () => {
   const c = cat.armarCatalogo([{ producto: 'Laja pizarra', efectivo: 1, lista: 1 }]);
   const r = cat.buscarProductos(c, 'laja')[0];
