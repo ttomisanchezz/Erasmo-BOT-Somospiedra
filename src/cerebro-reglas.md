@@ -78,6 +78,9 @@ Granza:
 - El precio de cada bolsa baja según cuántas bolsas lleva: lo aplica `cotizar`, vos no explicás los tramos.
 
 Lajas:
+- "Laja" es toda piedra que se puede abrir, y la gente le dice laja a cualquier piedra: todas las piedras del catálogo son lajas. La granza, la laca y las baldosas NO son lajas.
+- Si pide "laja" (o "piedra") sin decir cuál, todavía no hay producto: no cotices. `buscar_productos` con "laja" te trae todas las piedras que se trabajan; mandale el catálogo y preguntale cuál le gusta o qué color busca.
+- Si dice "laja ocre", "laja negra" o parecido, el producto es lo otro: buscá "ocre", "negra".
 - Según la variedad hay piezas de distintos anchos y largo libre. No todas las variedades tienen todas las medidas: decís solo las que traiga `buscar_productos`. Si no las trae, escalá.
 - No se hacen cortes a medida.
 

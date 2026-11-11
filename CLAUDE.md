@@ -105,6 +105,10 @@ vuelve a intentar). Lo prueba `test/piedra-sonnet.test.js`.
   malla**, litro. Test: `test/cotizador-piedra.test.js`.
 - `src/catalogo-piedra.js`: filas de la planilla a productos (pesos a centavos) y `buscarProductos`. Test:
   `test/catalogo-piedra.test.js`.
+  **"Laja" (Tomás, 11/11/2026):** laja es toda piedra que se puede abrir y la gente le dice laja (o "piedra") a cualquier
+  piedra, así que todas las piedras del catálogo son lajas; la granza, la laca y las baldosas no. `buscarProductos` con
+  "laja" sola devuelve todas las piedras (`pideLajaEnGeneral`), sin tope; con "laja ocre" busca "ocre". La herramienta
+  avisa que no es un producto para cotizar: catálogo y preguntar cuál. Lo mismo dice `cerebro-reglas.md` ("Lajas").
 
 ## Erasmo en modo tester (09/11/2026)
 

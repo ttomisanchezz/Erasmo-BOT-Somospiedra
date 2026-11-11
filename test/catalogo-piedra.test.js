@@ -127,6 +127,54 @@ caso('buscar: singular y plural dan lo mismo ("adoquines" encuentra "Adoquin", "
   assert.deepStrictEqual(nombres('gres'), []);
 });
 
+caso('buscar "laja": toda piedra es laja; la granza, la laca y las baldosas no (Tomás, 11/11/2026)', () => {
+  const c = cat.armarCatalogo([
+    { producto: 'Ocre Irregular', efectivo: 1, lista: 1 },
+    { producto: 'Ocre Murete Irregular', efectivo: 1, lista: 1 },
+    { producto: 'Pizarra Negra 30 Cm', efectivo: 1, lista: 1 },
+    { producto: 'Adoquines Ojito', efectivo: 1, lista: 1 },
+    { producto: 'Travertino Irregular', efectivo: 1, lista: 1 },
+    { producto: 'Verde Bronce Irregular', efectivo: 1, lista: 1 },
+    { producto: 'Zapala Irregular', efectivo: 1, lista: 1 },
+    { producto: 'Granza gris', efectivo: 1, lista: 1 },
+    { producto: 'Laca acrílica incolora Lata 1 litro', efectivo: 1, lista: 1 },
+    { producto: 'Baldosa 40X40 Vainilla', efectivo: 1, lista: 1 },
+    { producto: 'Baldosa Piedra Lavada 40X40', efectivo: 1, lista: 1 },
+    { producto: 'Envío', efectivo: 1, lista: 1 },
+    { producto: 'Flete paletizado', efectivo: 1, lista: 1 },
+    { producto: 'Garden Block 35X35 Cm', efectivo: 1, lista: 1 },
+  ]);
+  const nombres = (q, o) => cat.buscarProductos(c, q, o).map((x) => x.nombre);
+  const piedras = ['Adoquines Ojito', 'Ocre Irregular', 'Ocre Murete Irregular', 'Pizarra Negra 30 Cm', 'Travertino Irregular', 'Verde Bronce Irregular', 'Zapala Irregular'];
+  // "laja" (o "piedra") sin nombrar ninguna: todas las piedras, aunque sean más que el tope
+  assert.deepStrictEqual(nombres('laja', { max: 3 }), piedras);
+  assert.deepStrictEqual(nombres('lajas'), piedras);
+  assert.deepStrictEqual(nombres('piedras'), piedras);
+  assert.deepStrictEqual(nombres('las lajas para el frente'), piedras, '"frente" no es un producto');
+  assert.strictEqual(cat.pideLajaEnGeneral(c, 'laja'), true);
+  assert.strictEqual(cat.pideLajaEnGeneral(c, 'laja san luis'), true, 'una que no se trabaja: se ve la lista entera');
+  // "laja ocre": el producto es lo otro
+  assert.deepStrictEqual(nombres('laja ocre'), ['Ocre Irregular', 'Ocre Murete Irregular']);
+  assert.deepStrictEqual(nombres('piedra negra'), ['Pizarra Negra 30 Cm']);
+  assert.strictEqual(cat.pideLajaEnGeneral(c, 'laja ocre'), false);
+  // lo que no es laja se sigue encontrando por su nombre, también si le dicen laja o piedra
+  assert.deepStrictEqual(nombres('laja vainilla'), ['Baldosa 40X40 Vainilla']);
+  assert.deepStrictEqual(nombres('piedra lavada'), ['Baldosa Piedra Lavada 40X40']);
+  assert.deepStrictEqual(nombres('granza'), ['Granza gris']);
+  assert.deepStrictEqual(nombres('laca'), ['Laca acrílica incolora Lata 1 litro']);
+  assert.strictEqual(cat.pideLajaEnGeneral(c, 'granza'), false);
+  assert.strictEqual(cat.pideLajaEnGeneral(c, ''), false);
+});
+
+caso('buscar "laja": si un producto se llama así, va primero', () => {
+  const c = cat.armarCatalogo([
+    { producto: 'Zapala Irregular', efectivo: 1, lista: 1 },
+    { producto: 'Laja San Luis', efectivo: 1, lista: 1 },
+  ]);
+  assert.deepStrictEqual(cat.buscarProductos(c, 'laja').map((x) => x.nombre), ['Laja San Luis', 'Zapala Irregular']);
+  assert.deepStrictEqual(cat.buscarProductos(c, 'laja san luis').map((x) => x.nombre), ['Laja San Luis']);
+});
+
 caso('buscar no devuelve precios (los montos salen solo de cotizar)', () => {
   const c = cat.armarCatalogo([{ producto: 'Laja pizarra', efectivo: 1, lista: 1 }]);
   const r = cat.buscarProductos(c, 'laja')[0];

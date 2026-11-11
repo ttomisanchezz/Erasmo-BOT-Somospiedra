@@ -21,7 +21,7 @@ const state = require('./state');
 const documentos = require('./documentos');
 const cotizador = require('./cotizador-piedra');
 const granza = require('./granza');
-const { buscarProductos } = require('./catalogo-piedra');
+const { buscarProductos, pideLajaEnGeneral } = require('./catalogo-piedra');
 
 /** Obra grande: arriba de esto lo ve una persona (reglas aprobadas, "Lo que siempre escalás"). */
 const M2_MAXIMO = 100;
@@ -80,11 +80,18 @@ function decimalComoTexto(t) {
 // ---------------------------------------------------------------------------
 // buscar_productos
 // ---------------------------------------------------------------------------
+/** Lo que acompaña a la lista de piedras cuando el cliente dijo "laja" o "piedra" sin nombrar ninguna (Tomás, 11/11/2026). */
+const AVISO_LAJA =
+  '"Laja" es cualquier piedra: la gente le dice así a todas, y estas son las que se trabajan (la granza, la laca y las baldosas no ' +
+  'son lajas). Todavía no hay un producto para cotizar: mandale el catálogo y preguntale cuál le gusta o qué color busca. Si nombró ' +
+  'una que no está en esta lista, no la inventes: escalá.';
+
 const BUSCAR_PRODUCTOS = {
   definicion: {
     name: 'buscar_productos',
     description:
-      'Busca en la lista de productos de Somos Piedra por nombre (por ejemplo "laja", "adoquines ojito", "granza blanca"). ' +
+      'Busca en la lista de productos de Somos Piedra por nombre (por ejemplo "ocre", "adoquines ojito", "granza blanca"). ' +
+      '"Laja" o "piedra" sin nombrar ninguna trae todas las piedras; con "laja ocre" buscá "ocre". ' +
       'Devuelve los nombres EXACTOS, cómo se vende cada uno (m², bolsa, caja, unidad…) y si tiene precio cargado. No devuelve ' +
       'precios: los montos salen solo de cotizar. Con la búsqueda vacía lista lo que se trabaja. Si no devuelve nada, ese ' +
       'producto no se trabaja o no está cargado: no inventes, escalá.',
@@ -97,7 +104,9 @@ const BUSCAR_PRODUCTOS = {
     const filas = consulta
       ? buscarProductos(cat, consulta, { max: MAX_BUSQUEDA + 1 })
       : cat.productos.slice(0, MAX_LISTA + 1).map((p) => ({ nombre: p.nombre, unidad: p.unidad || null, tienePrecio: Boolean(p.efectivoCentavos || p.listaCentavos) }));
-    const tope = consulta ? MAX_BUSQUEDA : MAX_LISTA;
+    // "laja" (o "piedra") sin nombrar ninguna: son todas las piedras, así que va la lista entera.
+    const enGeneral = Boolean(consulta) && pideLajaEnGeneral(cat, consulta);
+    const tope = consulta && !enGeneral ? MAX_BUSQUEDA : MAX_LISTA;
     const productos = filas.slice(0, tope).map((f) => {
       const p = porNombre.get(f.nombre) || {};
       const esGranza = granza.esGranza(p);
@@ -110,6 +119,7 @@ const BUSCAR_PRODUCTOS = {
     });
     const r = { productos, hay_mas: filas.length > tope };
     if (!productos.length) r.aviso = 'No hay productos con ese nombre. No lo trabajamos o no está cargado: no inventes nada, si lo pide el cliente escalá.';
+    else if (enGeneral) r.aviso = AVISO_LAJA;
     else if (productos.some((p) => !p.tiene_precio)) r.aviso = 'Los que dicen tiene_precio false no se pueden cotizar: si el cliente quiere uno de esos, escalá.';
     return r;
   },

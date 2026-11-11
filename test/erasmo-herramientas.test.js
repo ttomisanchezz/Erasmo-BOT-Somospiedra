@@ -36,6 +36,16 @@ const totalesDe = (r) => r.totales.map((t) => t.total);
     assert.strictEqual(r.productos[0].tiene_precio, true);
     assert.ok(!/\$|\d{4,}/.test(JSON.stringify(r)), 'trae un monto: ' + JSON.stringify(r));
   });
+  await check('"laja" sola trae todas las piedras (no la granza) y avisa que no es un producto para cotizar', async () => {
+    const r = await por('buscar_productos').correr({ consulta: 'lajas' });
+    const nombres = r.productos.map((p) => p.nombre);
+    assert.deepStrictEqual(nombres.slice(0, 2), ['Laja en caja', 'Laja San Luis']);
+    for (const n of ['Adoquines ojito', 'Lomo de burro', 'Piedra bola']) assert.ok(nombres.includes(n), 'falta ' + n);
+    assert.ok(!nombres.some((n) => /granza/i.test(n)), 'la granza no es laja');
+    assert.match(r.aviso, /cualquier piedra/);
+    assert.strictEqual(r.hay_mas, false);
+    assert.ok(!/\$|\d{4,}/.test(JSON.stringify(r)), 'trae un monto');
+  });
   await check('un producto sin precio lo dice (tiene_precio false) y avisa que se escala', async () => {
     const r = await por('buscar_productos').correr({ consulta: 'piedra bola' });
     assert.strictEqual(r.productos[0].tiene_precio, false);

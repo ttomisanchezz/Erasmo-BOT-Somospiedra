@@ -143,24 +143,69 @@ function formas(w) {
   return f;
 }
 
+// "Laja" es toda piedra que se puede abrir, y la gente le dice laja (o "piedra") a cualquier piedra: todas las piedras del
+// catálogo son lajas. No lo son la granza, la laca ni las baldosas (Tomás, 11/11/2026); tampoco lo que no es piedra (el envío, el
+// flete, los bloques de cemento, la tela, el césped). Por eso "laja" sola no es un producto: es la lista de piedras.
+const GENERICAS = new Set(['laja', 'lajas', 'piedra', 'piedras']);
+const NO_ES_LAJA = new Set(['granza', 'laca', 'lacas', 'baldosa', 'baldosas', 'envio', 'envios', 'flete', 'fletes', 'garden', 'tela', 'cesped']);
+const esLaja = (p) => !palabras(p.nombre).some((w) => NO_ES_LAJA.has(w));
+
+/** ¿Alguna palabra del nombre (`suyas`) es la pedida? Igual, empieza con ella (3 letras o más) o es su singular o plural. */
+function coincide(suyas, w) {
+  const formasW = formas(w);
+  return suyas.some((s) => s === w || (w.length >= 3 && s.startsWith(w)) || formas(s).some((f) => formasW.includes(f)));
+}
+
+const pedidasDe = (consulta) => palabras(consulta || '').filter((w) => !PARADAS.has(w));
+
+/**
+ * ¿La consulta pide "laja" (o "piedra") sin nombrar ningún producto? "laja", "lajas para el frente" o "laja san luis" (si no se
+ * trabaja) sí; "laja ocre" o "piedra lavada" no: ahí el producto es lo otro.
+ */
+function pideLajaEnGeneral(catalogo, consulta) {
+  const pedidas = pedidasDe(consulta);
+  if (!pedidas.some((w) => GENERICAS.has(w))) return false;
+  const otras = pedidas.filter((w) => !GENERICAS.has(w));
+  return !((catalogo && catalogo.productos) || []).some((p) => {
+    const suyas = palabras(p.nombre);
+    return otras.some((w) => coincide(suyas, w));
+  });
+}
+
+/**
+ * Los productos que coinciden con la consulta, del que más coincide al que menos (hasta `max`). Con "laja" o "piedra" más otra
+ * cosa, se busca por lo otro ("laja ocre" -> los Ocre). Con "laja" en general (`pideLajaEnGeneral`), TODAS las piedras, sin tope:
+ * primero las que se llaman así y después el resto por nombre.
+ */
 function buscarProductos(catalogo, consulta, { max = 5 } = {}) {
-  const pedidas = palabras(consulta || '').filter((w) => !PARADAS.has(w));
-  if (!pedidas.length) return [];
+  const todas = pedidasDe(consulta);
+  if (!todas.length) return [];
+  const productos = (catalogo && catalogo.productos) || [];
+  const otras = todas.filter((w) => !GENERICAS.has(w));
+  const pedidas = otras.length ? otras : todas;
+  const fila = (p, puntaje) => ({
+    nombre: p.nombre,
+    unidad: p.unidad || null,
+    tienePrecio: Boolean(p.efectivoCentavos || p.listaCentavos || (p.tramos || []).some((t) => t.efectivoCentavos || t.listaCentavos)),
+    puntaje,
+  });
+  const porNombre = (a, b) => b.puntaje - a.puntaje || a.nombre.localeCompare(b.nombre, 'es');
   const encontrados = [];
-  for (const p of (catalogo && catalogo.productos) || []) {
+  for (const p of productos) {
     const suyas = palabras(p.nombre);
     let puntaje = 0;
-    for (const w of pedidas) {
-      const formasW = formas(w);
-      if (suyas.some((s) => s === w || (w.length >= 3 && s.startsWith(w)) || formas(s).some((f) => formasW.includes(f)))) puntaje++;
-    }
-    if (puntaje) {
-      const tienePrecio = Boolean(p.efectivoCentavos || p.listaCentavos || (p.tramos || []).some((t) => t.efectivoCentavos || t.listaCentavos));
-      encontrados.push({ nombre: p.nombre, unidad: p.unidad || null, tienePrecio, puntaje });
-    }
+    for (const w of pedidas) if (coincide(suyas, w)) puntaje++;
+    if (puntaje) encontrados.push(fila(p, puntaje));
   }
-  encontrados.sort((a, b) => b.puntaje - a.puntaje || a.nombre.localeCompare(b.nombre, 'es'));
+  encontrados.sort(porNombre);
+  if (pideLajaEnGeneral(catalogo, consulta)) {
+    // Lo que se llama "laja …" o "piedra …" y es una piedra (si lo hay) y, después, el resto de las piedras.
+    const primeras = encontrados.filter(esLaja);
+    const ya = new Set(primeras.map((e) => e.nombre));
+    const resto = productos.filter((p) => esLaja(p) && !ya.has(p.nombre)).map((p) => fila(p, 0)).sort(porNombre);
+    return [...primeras, ...resto];
+  }
   return encontrados.slice(0, max);
 }
 
-module.exports = { pesosACentavos, armarCatalogo, buscarProductos };
+module.exports = { pesosACentavos, armarCatalogo, buscarProductos, pideLajaEnGeneral };
