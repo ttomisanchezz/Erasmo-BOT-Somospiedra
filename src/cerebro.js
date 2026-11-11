@@ -541,6 +541,7 @@ function armarContexto(s, mensaje, nombre, ahora, hasta = null, { audio = false,
   const antes = (l) => hasta == null || (Number(l && l.ts) || 0) <= hasta;
   const historial = (s.historial || []).filter(antes).slice(-state.LARGO_HISTORIAL);
   const persona = state.lineasDePersona(s).filter(antes);
+  const yaPregunto = salida.preguntasHechas(historial);
   const sabe = loQueSabe(s, nombre);
   const mandadas = (fotos && fotos.mandadas) || 0;
   const escribio = String(mensaje || '').trim() || !mandadas ? limpio(mensaje) : `(mandó ${unaOVarias(mandadas)}, sin texto)`;
@@ -555,6 +556,9 @@ function armarContexto(s, mensaje, nombre, ahora, hasta = null, { audio = false,
     '',
     `Historial (las últimas ${historial.length} líneas, de la más vieja a la más nueva):`,
     ...(historial.length ? historial.map((m) => `[${haceCuanto(m.ts, ahora)}] ${quien(m)}: ${limpio(m.texto)}`) : ['(vacío)']),
+    '',
+    'Preguntas que ya le hiciste en este chat (no las repitas, ni igual ni con otras palabras; si no la contestó, seguí con otro tema o sin pregunta):',
+    ...(yaPregunto.length ? yaPregunto.map((p) => `- ${limpio(p)}`) : ['- ninguna']),
     '',
     audio ? 'Lo que dijo ahora el cliente, en un audio transcripto (contestá esto):' : 'Lo que escribió ahora el cliente (contestá esto):',
     '"""',

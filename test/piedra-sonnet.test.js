@@ -266,6 +266,20 @@ const nuevo = () => `54900000${String(++n).padStart(5, '0')}`;
       'Dale! Contame y lo vemos.',
     ]);
   });
+  await check('el pedido le dice a Sonnet qué preguntas ya hizo en el chat (para que no las repita con otras palabras)', async () => {
+    const num = nuevo();
+    sonnet.guion(
+      sonnet.responde(['Hola, buen día! Cómo estás? Espero que bien.', 'Lo necesitabas para el patio, el frente o una pared? Así te oriento mejor.']),
+      sonnet.responde(['Dale.'])
+    );
+    await bot.procesar(mensaje(num, 'hola'));
+    assert.match(sonnet.textoDelPedido(0), /Preguntas que ya le hiciste en este chat[^\n]*\n- ninguna/);
+    await bot.procesar(mensaje(num, 'hay cuotas?'));
+    const texto = sonnet.textoDelPedido(1);
+    assert.match(texto, /Preguntas que ya le hiciste en este chat[^\n]*\n- Lo necesitabas para el patio, el frente o una pared\?\n/);
+    assert.ok(!/\n- Cómo estás\?/.test(texto), 'la del saludo no va en la lista');
+    assert.ok(texto.indexOf('Preguntas que ya le hiciste') < texto.indexOf('Lo que escribió ahora el cliente'), 'va antes de lo que escribió el cliente');
+  });
   await check('una pregunta nueva sale, y la del saludo ("Cómo estás?") no cuenta como repetida', async () => {
     const num = nuevo();
     sonnet.guion(

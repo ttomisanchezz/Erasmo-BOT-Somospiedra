@@ -82,8 +82,10 @@ vuelve a intentar). Lo prueba `test/piedra-sonnet.test.js`.
   un `agendar_seguimiento` junto con `responder` se perdía. Test: `test/erasmo-tester.test.js`.
 - **Preguntas repetidas** (11/11/2026): `salida.sinLoYaDicho` saca de cada texto la pregunta que la cuenta ya hizo en
   el chat (igual o con otra puntuación; de 12 letras o más, así "Cómo estás?" no cuenta) y sale lo demás. La regla
-  de `cerebro-reglas.md` sola no alcanzaba (11/11: la repitió tras «se puede pagar en cuotas?»). Test:
-  `test/piedra-sonnet.test.js`.
+  de `cerebro-reglas.md` sola no alcanzaba (11/11: la repitió tras «se puede pagar en cuotas?»). El filtro solo ataja
+  la repetición textual: en vivo Sonnet la volvió a hacer con otras palabras («Qué estás armando, el patio, el frente o
+  una pared?»), así que el pedido (`armarContexto`) lleva además la lista «Preguntas que ya le hiciste en este chat»
+  (`salida.preguntasHechas`). Test: `test/piedra-sonnet.test.js`.
 - `armarContexto`: fecha de Neuquén, lo que sabe el estado, las líneas de una persona de la cuenta, las
   últimas 30 líneas del historial (completado con Evolution por `src/contexto.js`), la tanda y, en vivo,
   hasta 3 fotos del cliente. Sin el número del cliente; el nombre, tapado.

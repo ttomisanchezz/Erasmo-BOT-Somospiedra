@@ -36,6 +36,23 @@ function claveDePregunta(frase) {
 const preguntasDe = (texto) => enFrases(texto).map(claveDePregunta).filter(Boolean);
 
 /**
+ * Las preguntas de la venta que la cuenta ya hizo, como texto y sin repetir, de la más vieja a la más nueva. `lineas`: líneas del
+ * historial. Va en el pedido a Sonnet (cerebro.armarContexto) para que no las repita ni con otras palabras: el filtro de abajo
+ * solo ataja la repetición textual.
+ */
+function preguntasHechas(lineas) {
+  const vistas = new Map();
+  for (const m of lineas || []) {
+    if (!m || m.quien !== 'vendedor' || m.sinConfirmar) continue;
+    for (const frase of enFrases(m.texto)) {
+      const clave = claveDePregunta(frase);
+      if (clave && !vistas.has(clave)) vistas.set(clave, frase.trim().replace(/^¿/, ''));
+    }
+  }
+  return [...vistas.values()];
+}
+
+/**
  * El texto sin las preguntas que ya se le hicieron (`yaPreguntado`: claves). Lo demás queda tal cual, con sus
  * separadores; si no queda nada, ''.
  */
@@ -96,4 +113,4 @@ function primerNombre(pushName) {
   return nombre ? [...nombre].slice(0, 20).join('') : '';
 }
 
-module.exports = { sinLoYaDicho, primerNombre, TODO_REPETIDO };
+module.exports = { sinLoYaDicho, preguntasHechas, primerNombre, TODO_REPETIDO };
