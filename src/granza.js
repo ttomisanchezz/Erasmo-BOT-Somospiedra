@@ -8,13 +8,14 @@
  *  - SIEMPRE por m², en bolsas de unos 40 kg: 1 bolsa = 1 m² a 3 cm de espesor (equivalencia comercial
  *    orientativa). Nunca por bolsón: en bolsas se vende más cantidad.
  *  - Los 4 colores (blanca Mar del Plata, gris con roja, roja y gris Tandil) tienen el mismo precio.
- *  - El precio de cada bolsa baja según cuántas bolsas lleva (precios del 06/11, por bolsa):
- *      efectivo / transferencia: $22.000, $20.000 y $15.000
- *      tarjeta (un solo pago):   $27.000, $25.000 y $19.000
+ *  - El precio de cada bolsa baja según cuántas bolsas lleva (precios del 06/11, por bolsa, con dos que fijó Tomás el
+ *    11/11/2026 para que coincidan con la planilla del local: 20 m² en efectivo $310.000 y 1 m² con tarjeta $26.500):
+ *      efectivo / transferencia: $22.000, $20.000 y $15.500
+ *      tarjeta (un solo pago):   $26.500, $25.000 y $19.000
  *
  * SUPUESTO A CONFIRMAR CON FRAN (anotado en REVISAR.md): los tramos son de 1 a 9 bolsas, de 10 a 19 y desde 20,
  * como la estructura de la ronda 2 (30/10). Con estas bandas, 19 bolsas ($380.000 en efectivo) salen MÁS caras
- * que 20 ($300.000): el código no lo arregla, cobra el precio de la banda.
+ * que 20 ($310.000): el código no lo arregla, cobra el precio de la banda.
  *
  * El tramo se elige por la cantidad de BOLSAS (los m² redondeados para arriba) y ese precio vale para todas las
  * bolsas. La cuenta se hace en dos pasadas con el cotizador: la primera cuenta las bolsas, la segunda cobra.
@@ -23,9 +24,9 @@ const cotizador = require('./cotizador-piedra');
 
 /** Los tramos: `desde` es la primera cantidad de bolsas del tramo. Precios por bolsa, en centavos. */
 const TRAMOS = [
-  { desde: 1, hasta: 9, efectivoCentavos: 2200000, listaCentavos: 2700000 },
+  { desde: 1, hasta: 9, efectivoCentavos: 2200000, listaCentavos: 2650000 },
   { desde: 10, hasta: 19, efectivoCentavos: 2000000, listaCentavos: 2500000 },
-  { desde: 20, hasta: null, efectivoCentavos: 1500000, listaCentavos: 1900000 },
+  { desde: 20, hasta: null, efectivoCentavos: 1550000, listaCentavos: 1900000 },
 ];
 
 /** Una bolsa de ~40 kg cubre 1 m² a 3 cm. */

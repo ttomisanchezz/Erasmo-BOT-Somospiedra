@@ -122,7 +122,8 @@ Cómo prenderlo: `PRENDER-TESTER.md`. Qué revisar (cuentas y decisiones de plat
   falla, la última copia buena (con un respiro de 60 s sin volver a pedir); si nunca cargó, FALTA DATO. Con filas de
   más de un negocio, todo FALTA DATO. Test: `test/precios-panel.test.js` (Supabase de mentira).
 - `src/granza.js`: la granza NO está en el panel: tabla de tramos en un solo lugar (por bolsa: efectivo $22.000 /
-  $20.000 / $15.000, tarjeta $27.000 / $25.000 / $19.000; **supuesto**: tramos de 1 a 9, 10 a 19 y desde 20 bolsas),
+  $20.000 / $15.500, tarjeta $26.500 / $25.000 / $19.000, con los dos precios que fijó Tomás el 11/11/2026: 20 m² en
+  efectivo $310.000 y 1 m² con tarjeta $26.500; **supuesto**: tramos de 1 a 9, 10 a 19 y desde 20 bolsas),
   por m², 1 bolsa = 1 m² a 3 cm, nunca por bolsón. Test: `test/granza.test.js`.
 - `src/herramientas-erasmo.js`: `buscar_productos` (nombres exactos, sin precios), `cotizar` (producto exacto + m² /
   largo y ancho / cantidad, forma de pago, con o sin factura → los totales ya escritos; tarjeta un solo pago; sin

@@ -158,14 +158,14 @@ const totalesDe = (r) => r.totales.map((t) => t.total);
     assert.deepStrictEqual([totalesDe(sin)[0], totalesDe(con)[0]], ['$780.000', '$858.000']);
     assert.ok((await por('cotizar').correr({ producto: 'Adoquines ojito', m2: '10', desperdicio_pct: 50 }, turno())).error);
   });
-  await check('granza por m2: 5, 12 y 25 m2, con y sin factura (los precios del 06/11)', async () => {
+  await check('granza por m2: 5, 12 y 25 m2, con y sin factura (los precios del 06/11 con los dos que fijó Tomás el 11/11)', async () => {
     const g = async (m2, con_factura) => totalesDe(await por('cotizar').correr({ producto: 'Granza roja', m2: String(m2), con_factura }, turno()));
-    assert.deepStrictEqual(await g(5), ['$110.000', '$135.000']);
+    assert.deepStrictEqual(await g(5), ['$110.000', '$132.500']);
     assert.deepStrictEqual(await g(12), ['$240.000', '$300.000']);
-    assert.deepStrictEqual(await g(25), ['$375.000', '$475.000']);
-    assert.deepStrictEqual(await g(5, true), ['$133.100', '$163.300']);
+    assert.deepStrictEqual(await g(25), ['$387.500', '$475.000']);
+    assert.deepStrictEqual(await g(5, true), ['$133.100', '$160.300']);
     assert.deepStrictEqual(await g(12, true), ['$290.400', '$363.000']);
-    assert.deepStrictEqual(await g(25, true), ['$453.700', '$574.700']);
+    assert.deepStrictEqual(await g(25, true), ['$468.800', '$574.700']);
     const r = await por('cotizar').correr({ producto: 'Granza roja', m2: '12,25' }, turno());
     assert.match(r.cantidad, /^13 bolsas/);
     assert.strictEqual(r.precio_de_una_unidad.por_forma_de_pago[0].precio, '$20.000'); // el tramo de 10 a 19 bolsas

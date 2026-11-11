@@ -18,8 +18,8 @@ const cuenta = (m2) => g.cotizarGranza({ producto: granza, m2, config: CONFIG })
 
 console.log('granza');
 
-caso('la tabla de tramos esta en un solo lugar y es la del 06/11', () => {
-  assert.deepStrictEqual(g.TRAMOS.map((t) => [t.desde, t.efectivoCentavos / 100, t.listaCentavos / 100]), [[1, 22000, 27000], [10, 20000, 25000], [20, 15000, 19000]]);
+caso('la tabla de tramos esta en un solo lugar: la del 06/11 con los dos precios que fijo Tomas el 11/11 (20 m2 en efectivo $310.000, 1 m2 con tarjeta $26.500)', () => {
+  assert.deepStrictEqual(g.TRAMOS.map((t) => [t.desde, t.efectivoCentavos / 100, t.listaCentavos / 100]), [[1, 22000, 26500], [10, 20000, 25000], [20, 15500, 19000]]);
   assert.strictEqual(g.tramoPara(1).desde, 1);
   assert.strictEqual(g.tramoPara(9).desde, 1);
   assert.strictEqual(g.tramoPara(10).desde, 10);
@@ -30,13 +30,13 @@ caso('la tabla de tramos esta en un solo lugar y es la del 06/11', () => {
   assert.strictEqual(g.tramoPara(2.5), null);
 });
 
-caso('5 m2: 5 bolsas, tramo 1-9: efectivo 110.000 / tarjeta 135.000; con factura 133.100 / 163.300', () => {
+caso('5 m2: 5 bolsas, tramo 1-9: efectivo 110.000 / tarjeta 132.500; con factura 133.100 / 160.300 (132.500 x 1,21 = 160.325, para abajo)', () => {
   const r = cuenta(5);
   assert.strictEqual(r.ok, true, JSON.stringify(r));
   assert.strictEqual(r.bolsas, 5);
   assert.strictEqual(r.unidad, 'bolsa');
-  assert.deepStrictEqual([pesos(r.efectivo.totalCentavos), pesos(r.lista.totalCentavos)], ['$110.000', '$135.000']);
-  assert.deepStrictEqual([pesos(r.efectivo.conFactura.totalCentavos), pesos(r.lista.conFactura.totalCentavos)], ['$133.100', '$163.300']);
+  assert.deepStrictEqual([pesos(r.efectivo.totalCentavos), pesos(r.lista.totalCentavos)], ['$110.000', '$132.500']);
+  assert.deepStrictEqual([pesos(r.efectivo.conFactura.totalCentavos), pesos(r.lista.conFactura.totalCentavos)], ['$133.100', '$160.300']);
 });
 
 caso('12 m2: 12 bolsas, tramo 10-19: 240.000 / 300.000; con factura 290.400 / 363.000', () => {
@@ -47,12 +47,12 @@ caso('12 m2: 12 bolsas, tramo 10-19: 240.000 / 300.000; con factura 290.400 / 36
   assert.deepStrictEqual([pesos(r.efectivo.conFactura.totalCentavos), pesos(r.lista.conFactura.totalCentavos)], ['$290.400', '$363.000']);
 });
 
-caso('25 m2: 25 bolsas, tramo desde 20: 375.000 / 475.000; con factura 453.700 / 574.700 (redondeado para abajo)', () => {
+caso('25 m2: 25 bolsas, tramo desde 20: 387.500 / 475.000; con factura 468.800 / 574.700 (387.500 x 1,21 = 468.875, para abajo)', () => {
   const r = cuenta(25);
   assert.strictEqual(r.bolsas, 25);
   assert.deepStrictEqual(r.tramo, { desde: 20, hasta: null });
-  assert.deepStrictEqual([pesos(r.efectivo.totalCentavos), pesos(r.lista.totalCentavos)], ['$375.000', '$475.000']);
-  assert.deepStrictEqual([pesos(r.efectivo.conFactura.totalCentavos), pesos(r.lista.conFactura.totalCentavos)], ['$453.700', '$574.700']);
+  assert.deepStrictEqual([pesos(r.efectivo.totalCentavos), pesos(r.lista.totalCentavos)], ['$387.500', '$475.000']);
+  assert.deepStrictEqual([pesos(r.efectivo.conFactura.totalCentavos), pesos(r.lista.conFactura.totalCentavos)], ['$468.800', '$574.700']);
 });
 
 caso('3,5 x 3,5 = 12,25 m2 -> 13 bolsas (los m2 se redondean para arriba)', () => {
@@ -69,7 +69,14 @@ caso('el tramo se elige por bolsas: 9,2 m2 son 10 bolsas y entran al tramo de 10
 
 caso('el limite de los tramos: 9 y 10 bolsas, 19 y 20 bolsas (19 sale mas caro que 20: se cobra la banda)', () => {
   const total = (n) => g.cotizarGranza({ producto: granza, cantidad: n, config: CONFIG }).efectivo.totalCentavos / 100;
-  assert.deepStrictEqual([9, 10, 19, 20].map(total), [198000, 200000, 380000, 300000]);
+  assert.deepStrictEqual([9, 10, 19, 20].map(total), [198000, 200000, 380000, 310000]);
+});
+
+caso('los dos precios que fijo Tomas el 11/11: 20 m2 en efectivo $310.000 y 1 m2 con tarjeta $26.500', () => {
+  const veinte = cuenta(20);
+  assert.deepStrictEqual([pesos(veinte.efectivo.totalCentavos), pesos(veinte.lista.totalCentavos)], ['$310.000', '$380.000']);
+  const uno = cuenta(1);
+  assert.deepStrictEqual([pesos(uno.efectivo.totalCentavos), pesos(uno.lista.totalCentavos)], ['$22.000', '$26.500']);
 });
 
 caso('por bolsas directas; una fraccion de bolsa no existe', () => {

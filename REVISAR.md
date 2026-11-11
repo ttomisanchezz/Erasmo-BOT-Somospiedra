@@ -27,14 +27,15 @@ Efectivo / transferencia / Mercado Pago / QR = `productos.precio` del panel. Tar
 
 | m² | Bolsas | Tramo | Efectivo sin factura | Tarjeta sin factura | Efectivo con factura | Tarjeta con factura |
 |---|---|---|---|---|---|---|
-| 5 | 5 | 1 a 9 ($22.000 / $27.000) | $110.000 | $135.000 | $133.100 | $163.300 |
+| 5 | 5 | 1 a 9 ($22.000 / $26.500) | $110.000 | $132.500 | $133.100 | $160.300 |
 | 12 | 12 | 10 a 19 ($20.000 / $25.000) | $240.000 | $300.000 | $290.400 | $363.000 |
-| 25 | 25 | desde 20 ($15.000 / $19.000) | $375.000 | $475.000 | $453.700 | $574.700 |
+| 25 | 25 | desde 20 ($15.500 / $19.000) | $387.500 | $475.000 | $468.800 | $574.700 |
 
 Con factura: 133.100 = 110.000 × 1,21; 163.350 → 163.300; 290.400 = 240.000 × 1,21; 363.000 = 300.000 × 1,21; 453.750 → 453.700; 574.750 → 574.700. Otro ejemplo: 3,5 × 3,5 = 12,25 m² → 13 bolsas → 13 × $20.000 = $260.000 en efectivo sin factura.
 
 ### Supuestos y cosas para decidir
 
+- **Granza, precios del 11/11/2026 (Tomás):** 20 m² en efectivo $310.000 (la bolsa del tramo desde 20 pasó de $15.000 a $15.500) y 1 m² con tarjeta $26.500 (la bolsa del tramo de 1 a 9 pasó de $27.000 a $26.500), como la planilla del local. Las dos filas de arriba ya están con esos precios; lo demás no cambió. Sigue siendo supuesto que $15.500 vale por bolsa para más de 20 (25 m² = $387.500).
 - **Tramos de granza (supuesto a confirmar con Fran).** 1 a 9 bolsas, 10 a 19 y desde 20 (la estructura de la ronda 2). **Con estas bandas 19 bolsas salen más caras que 20**: en efectivo 19 × $20.000 = $380.000 contra 20 × $15.000 = $300.000; en tarjeta 19 × $25.000 = $475.000 contra 20 × $19.000 = $380.000. En los otros límites: 9 bolsas = $198.000 y 10 bolsas = $200.000 en efectivo (test: `test/granza.test.js`). El código cobra el precio de la banda y no lo arregla. Si Fran confirma otros tramos, se cambia la tabla de `src/granza.js` (y su test).
 - **Granza en el panel.** Si alguna vez la cargan en el panel, el bot la ignora (manda la tabla del código). Hoy no está.
 - **Precios del panel viejos.** Si Supabase falla, Erasmo usa la última copia buena (en memoria y en `data/precios/panel-cache.json`), **sin tope de antigüedad**: si estuviera caído una semana, cotizaría con los precios de hace una semana. Si nunca cargó, escala todo lo que tenga precio. Hay un respiro de 60 s después de un fallo para no esperar a Supabase en cada consulta. ¿Ponemos un tope (por ejemplo 48 h)?
