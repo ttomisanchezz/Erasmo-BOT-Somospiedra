@@ -10,6 +10,7 @@
  *   5. `escalar`: al cliente nada, 🔕 al grupo, el chat queda callado y lo que sigue no llama a Sonnet.
  *   6. Sonnet falla (500, timeout, sin clave): silencio con el cliente y aviso al grupo, sin respaldo.
  *   7. Lo que ya se le dijo no se repite: si todo es repetido, escala.
+ *   8. Una pregunta que ya hizo en el chat no se repite: sale lo demás, sin la pregunta (11/11/2026).
  *
  *   node test/piedra-sonnet.test.js
  */
@@ -245,6 +246,55 @@ const nuevo = () => `54900000${String(++n).padStart(5, '0')}`;
     await bot.procesar(mensaje(num, 'hola'));
     assert.deepStrictEqual(aClientes.map((m) => m.texto), ['hola! que tal']);
     assert.match(alGrupo[0], /ya se lo dije/);
+  });
+
+  console.log('\nUna pregunta se hace una sola vez por chat\n');
+
+  await check('una pregunta que ya hizo no se repite: sale lo demás, sin la pregunta', async () => {
+    const num = nuevo();
+    sonnet.guion(
+      sonnet.responde(['Lo necesitabas para el patio, el frente o una pared? Así te oriento mejor.']),
+      sonnet.responde(['Por ahora no tenemos cuotas, con tarjeta es en un pago.', 'Lo necesitabas para el patio, el frente o una pared?']),
+      sonnet.responde(['Dale! ¿Lo necesitabas para el patio, el frente o una pared? Contame y lo vemos.'])
+    );
+    await bot.procesar(mensaje(num, 'hola'));
+    await bot.procesar(mensaje(num, 'hay cuotas?'));
+    await bot.procesar(mensaje(num, 'ok'));
+    assert.deepStrictEqual(aClientes.map((m) => m.texto), [
+      'Lo necesitabas para el patio, el frente o una pared? Así te oriento mejor.',
+      'Por ahora no tenemos cuotas, con tarjeta es en un pago.',
+      'Dale! Contame y lo vemos.',
+    ]);
+  });
+  await check('una pregunta nueva sale, y la del saludo ("Cómo estás?") no cuenta como repetida', async () => {
+    const num = nuevo();
+    sonnet.guion(
+      sonnet.responde(['Hola, buen día! Cómo estás? Espero que bien.', 'Calculaste los m² que necesitás cubrir?']),
+      sonnet.responde(['Buenas! Cómo estás? Te cuento.', 'Lo retirás por el local o necesitás envío?'])
+    );
+    await bot.procesar(mensaje(num, 'hola'));
+    await bot.procesar(mensaje(num, 'buenas'));
+    assert.deepStrictEqual(aClientes.map((m) => m.texto).slice(2), ['Buenas! Cómo estás? Te cuento.', 'Lo retirás por el local o necesitás envío?']);
+  });
+  await check('sacar la pregunta repetida no toca los montos ni los saltos de línea; si era lo único, el mensaje no sale', async () => {
+    const salida = require('../src/salida');
+    const chat = jid(nuevo());
+    state.agregarAlHistorial(chat, 'vendedor', 'Dale. Lo retirás por el local o necesitás envío?', { id: 'X1' });
+    assert.deepStrictEqual(
+      salida.sinLoYaDicho(chat, [
+        'Con tarjeta te queda en $945.000. Lo retirás por el local o necesitás envío?',
+        'Uno\nDos. ¿Lo retiras por el local, o necesitas envio?\nTres.',
+        'Lo retirás por el local o necesitás envío?',
+        'Y para cuándo lo necesitás?',
+      ]),
+      ['Con tarjeta te queda en $945.000.', 'Uno\nDos.\nTres.', 'Y para cuándo lo necesitás?']
+    );
+  });
+  await check('una pregunta de un envío que no se confirmó no cuenta como hecha', async () => {
+    const salida = require('../src/salida');
+    const chat = jid(nuevo());
+    state.agregarAlHistorial(chat, 'vendedor', 'Lo retirás por el local o necesitás envío?', { sinConfirmar: true });
+    assert.deepStrictEqual(salida.sinLoYaDicho(chat, ['Dale. Lo retirás por el local o necesitás envío?']), ['Dale. Lo retirás por el local o necesitás envío?']);
   });
 
   p.fin();

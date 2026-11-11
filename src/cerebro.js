@@ -618,6 +618,11 @@ async function llamarApi(cuerpo, intento = 0) {
   }
 }
 
+/** Lo que vuelve en el `responder` cuando una herramienta de datos de la misma respuesta devolvió un error. */
+const TEXTO_DE_HERRAMIENTA_FALLIDA =
+  'Tu respuesta NO salió: una herramienta que llamaste en esta misma respuesta devolvió un error. Mirá su resultado y ' +
+  'volvé a llamar a responder (sin lo que dependía de eso) o a escalar.';
+
 /**
  * Lo que vuelve como error del `responder` que frenó la guardia: el motivo y cómo corregirlo. Sonnet tiene
  * una sola vuelta para arreglarlo; si no puede, escala.
@@ -702,24 +707,39 @@ async function pensar({ chatId, mensaje, nombre = '', ahora = Date.now(), hasta 
         return escala(motivo, corregida ? { corregida } : {});
       }
       if (respondio) {
+        // Las herramientas de datos que vinieron en la MISMA respuesta que `responder` corren antes de mirarla:
+        // lo que dejan (los montos de cotizar, el catálogo, el seguimiento) vale para esa respuesta. Hasta el
+        // 11/11/2026 solo corrían si la guardia frenaba: un `agendar_seguimiento` junto con `responder` se perdía.
+        const deDatos = new Map();
+        for (const b of usos) {
+          if (b === respondio) continue;
+          herramientas.push(b.name);
+          deDatos.set(b, await resultadoDe(b, turno));
+        }
         herramientas.push('responder');
+        // La API pide un tool_result por cada tool_use: el de `responder` vuelve como error con el porqué.
+        const devolver = (porque) =>
+          messages.push({
+            role: 'user',
+            content: usos.map((b) => (b === respondio ? { type: 'tool_result', tool_use_id: b.id, is_error: true, content: porque } : deDatos.get(b))),
+          });
+        // Una de esas herramientas falló: Sonnet escribió sin ver el error. No sale nada; lo ve y decide (no
+        // gasta la corrección de la guardia). Sin vueltas, escala.
+        if ([...deDatos.values()].some((x) => x.is_error)) {
+          if (vuelta < MAX_VUELTAS) {
+            devolver(TEXTO_DE_HERRAMIENTA_FALLIDA);
+            continue;
+          }
+          return escala('una herramienta falló junto con la respuesta y no quedaron vueltas', corregida ? { corregida } : {});
+        }
         const r = revisarSalida(respondio.input && respondio.input.mensajes, montos, { catalogo: turno.acciones.catalogo === true });
         if (r.guardia) {
           // Una vuelta más para corregir: el responder vuelve como error con el motivo, y las herramientas
-          // de datos que vinieron en la misma respuesta se contestan como siempre (la API pide un
-          // tool_result por cada tool_use). Si no quedan vueltas o ya corrigió una vez, escala.
+          // de datos que vinieron en la misma respuesta, con lo que devolvieron. Si no quedan vueltas o ya
+          // corrigió una vez, escala.
           if (!corregida && CORRECCIONES > 0 && vuelta < MAX_VUELTAS) {
             corregida = { guardia: r.guardia, frenados: r.frenados };
-            const resultados = [];
-            for (const b of usos) {
-              if (b === respondio) {
-                resultados.push({ type: 'tool_result', tool_use_id: b.id, is_error: true, content: textoDeCorreccion(r.guardia) });
-              } else {
-                herramientas.push(b.name);
-                resultados.push(await resultadoDe(b, turno));
-              }
-            }
-            messages.push({ role: 'user', content: resultados });
+            devolver(textoDeCorreccion(r.guardia));
             continue;
           }
           return escala(`guardia: ${r.guardia}`, { guardia: r.guardia, frenados: r.frenados, ...(corregida ? { corregida } : {}) });

@@ -76,6 +76,14 @@ vuelve a intentar). Lo prueba `test/piedra-sonnet.test.js`.
   (`src/promesas.js`), "te falta", mandar algo después, archivos (**salvo el catálogo en PDF, y solo si
   `mandar_catalogo` salió bien en ese turno**), nombres internos (también los de las herramientas nuevas), marcas
   de IA y caracteres raros. Si frena, Sonnet tiene **una** vuelta para corregir; si vuelve a frenar, escala.
+- **Herramientas junto con `responder`** (11/11/2026): las de datos que vienen en la MISMA respuesta que `responder`
+  corren antes de mirarla, y lo que dejan (montos, catálogo, seguimiento) vale para esa respuesta. Si una devuelve
+  error, no sale nada y Sonnet lo ve (no gasta la corrección de la guardia). Antes solo corrían si la guardia frenaba:
+  un `agendar_seguimiento` junto con `responder` se perdía. Test: `test/erasmo-tester.test.js`.
+- **Preguntas repetidas** (11/11/2026): `salida.sinLoYaDicho` saca de cada texto la pregunta que la cuenta ya hizo en
+  el chat (igual o con otra puntuación; de 12 letras o más, así "Cómo estás?" no cuenta) y sale lo demás. La regla
+  de `cerebro-reglas.md` sola no alcanzaba (11/11: la repitió tras «se puede pagar en cuotas?»). Test:
+  `test/piedra-sonnet.test.js`.
 - `armarContexto`: fecha de Neuquén, lo que sabe el estado, las líneas de una persona de la cuenta, las
   últimas 30 líneas del historial (completado con Evolution por `src/contexto.js`), la tanda y, en vivo,
   hasta 3 fotos del cliente. Sin el número del cliente; el nombre, tapado.

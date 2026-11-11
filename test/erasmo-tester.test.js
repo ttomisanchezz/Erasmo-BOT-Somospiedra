@@ -234,6 +234,47 @@ const alCliente = (num) => aClientes.filter((m) => m.numero === jid(num)).map((m
     assert.strictEqual(s.ficha.seguimiento.fecha, enDias(15));
     assert.ok(!alCliente(num).some((t) => /escrib|llam|contact/i.test(t)), 'le prometió algo al cliente');
   });
+  await check('agendar_seguimiento en la MISMA respuesta que responder también se anota, sin otra vuelta', async () => {
+    const num = deTester();
+    sonnet.guion([sonnet.usar('agendar_seguimiento', { fecha: enDias(15), motivo: 'arranca la obra en 15 días' }), sonnet.usar('responder', { mensajes: ['Dale, buenísimo!'] })]);
+    await bot.procesar(mensaje(num, 'dale, lo pienso. en 15 días arranco la obra'));
+    const s = state.todos()[jid(num)];
+    assert.strictEqual(s.seguimiento && s.seguimiento.fecha, enDias(15), 'el seguimiento se perdió');
+    assert.deepStrictEqual(alCliente(num), ['Dale, buenísimo!']);
+    assert.strictEqual(sonnet.pedidos.length, 1, 'gastó otra vuelta');
+    assert.deepStrictEqual(eventos(num, 'propuesta').at(-1).sonnet.herramientas, ['agendar_seguimiento', 'responder']);
+  });
+  await check('cotizar en la misma respuesta que responder: sus montos valen para esa respuesta; otro monto sigue frenando', async () => {
+    const num = deTester();
+    sonnet.guion([sonnet.usar('cotizar', { producto: 'Adoquines ojito', m2: '10', forma_pago: 'efectivo' }), sonnet.usar('responder', { mensajes: ['Para 10 m² te queda en $780.000 en efectivo.'] })]);
+    await bot.procesar(mensaje(num, 'cuanto salen 10 m2 de adoquines ojito en efectivo?'));
+    assert.deepStrictEqual(alCliente(num), ['Para 10 m² te queda en $780.000 en efectivo.']);
+    assert.strictEqual(sonnet.pedidos.length, 1);
+    const otro = deTester();
+    sonnet.guion(
+      [sonnet.usar('cotizar', { producto: 'Adoquines ojito', m2: '10', forma_pago: 'efectivo' }), sonnet.usar('responder', { mensajes: ['Te queda en $750.000 en efectivo.'] })],
+      sonnet.responde(['Te queda en $780.000 en efectivo.'])
+    );
+    await bot.procesar(mensaje(otro, 'cuanto salen 10 m2 de adoquines ojito en efectivo?'));
+    assert.deepStrictEqual(alCliente(otro).slice(-1), ['Te queda en $780.000 en efectivo.']);
+    assert.strictEqual(sonnet.pedidos.length, 2, 'no frenó el monto que cotizar no devolvió');
+    const vuelta = sonnet.pedidos[1].body.messages.at(-1).content;
+    assert.strictEqual(vuelta.length, 2, 'cotizar corrió dos veces o faltó un tool_result');
+  });
+  await check('una herramienta que falla en la misma respuesta que responder: no sale nada hasta que Sonnet ve el error', async () => {
+    const num = deTester();
+    sonnet.guion(
+      [sonnet.usar('agendar_seguimiento', { fecha: '2020-01-01', motivo: 'x' }), sonnet.usar('responder', { mensajes: ['Dale.'] })],
+      sonnet.responde(['Dale, buenísimo!'])
+    );
+    await bot.procesar(mensaje(num, 'en 15 días arranco'));
+    assert.strictEqual(sonnet.pedidos.length, 2, 'no le devolvió el error');
+    const vuelta = sonnet.pedidos[1].body.messages.at(-1).content;
+    assert.strictEqual(vuelta.length, 2);
+    assert.ok(vuelta.every((b) => b.type === 'tool_result' && b.is_error === true), JSON.stringify(vuelta));
+    assert.deepStrictEqual(alCliente(num), ['Dale, buenísimo!']);
+    assert.strictEqual(state.todos()[jid(num)].seguimiento, undefined);
+  });
   await check('si el turno escala, no se anota; y la sombra (cerebro.pensar) nunca anota', async () => {
     const num = deTester();
     sonnet.guion([sonnet.usar('agendar_seguimiento', { fecha: enDias(10), motivo: 'x' })], sonnet.escala('pide envío'));
