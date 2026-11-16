@@ -79,3 +79,11 @@ Con factura: 133.100 = 110.000 × 1,21; 163.350 → 163.300; 290.400 = 240.000 �
 - Casos de `evaluar` que cambiaron (ahora 18, todos al 100 %): «pregunta un precio: escala» pasó a «sin producto ni m²: pregunta qué producto y cuántos m²» (con las reglas aprobadas ya no se escala un precio, se cotiza o se pregunta); «un monto frenado y corregido» ya no usa «en un momento te paso la info» (promete mandar algo después). Se suman: cotiza granza 12 m², cotiza con factura (granza 5 m²), monto equivocado tras cotizar, producto que no está, pide envío (el viejo caso de escalar, con el dato), catálogo, catálogo prometido sin herramienta y seguimiento. La regla global «ningún monto» pasó a «ningún monto que no haya devuelto una herramienta en esa tanda».
 - `test/piedra-sonnet.test.js`: ahora verifica las 6 herramientas (antes 2) y que las reglas no traigan palabras de iPhone (la palabra «cuota» salió de la lista: es de Piedra).
 - `test/catalogo-piedra.test.js`: `caja` pasó de «desconocida» a unidad conocida (con `pallet` como ejemplo de desconocida).
+
+## 16/11/2026 (chat): ajustes tras la revisión de la sombra
+
+- El pedido a Sonnet dice de qué anuncio vino el chat (título; el último si llegó desde otro). Erasmo no lo nombra ni da por hecho el producto.
+- Reglas (`src/cerebro-reglas.md`, "Cómo se cotiza"): "cuadrados" = m² y el número tal cual (sombra: "4 negros cuadrados" → cotizó 40 m², $620.000); "la bolsa" = cotizar 1 bolsa (sombra: dio el precio de 20+).
+- **Sin cambiar** (decide Fran/Tomás): "precio sin producto no recibe precio". Fran pasa la granza de entrada ($22.000 la bolsa) y eso explica 88 de las diferencias.
+- `test/evaluar.js`: el caso "con factura" seguía con la granza vieja ($163.300); con $26.500 × 5 = $132.500 + 21 % = $160.325 → $160.300. Vuelve a dar 18/18.
+- `test/persistencia.test.js` falla también sin estos cambios (en la VM de Linux del chat); no se tocó.

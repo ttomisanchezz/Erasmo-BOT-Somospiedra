@@ -497,6 +497,9 @@ function loQueSabe(s, nombre) {
   if (notas.length) out.push(`contó: ${notas.join('; ')}`);
   if (s.resultado && s.resultado.tipo) out.push(`el chat está marcado como ${s.resultado.tipo === 'vendido' ? 'venta cerrada' : s.resultado.tipo}`);
   if (s.escalado) out.push('el chat está escalado a una persona');
+  // De qué anuncio vino (revisión de la sombra, 16/11/2026): Fran lo sabe al contestar; Erasmo no lo sabía.
+  const ad = s.anuncioUltimo || s.anuncio;
+  if (ad) out.push(ad.titulo ? `vino de un anuncio de Meta: "${String(ad.titulo).replace(/\s+/g, ' ').trim()}"` : 'vino de un anuncio de Meta (sin título)');
   return out;
 }
 

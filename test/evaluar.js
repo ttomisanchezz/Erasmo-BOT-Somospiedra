@@ -68,7 +68,7 @@ const CASOS = [
     pasos: [{ c: 'granza roja 5 m2, con factura' }],
     sonnet: [
       [sonnet.usar('cotizar', { producto: 'Granza roja', m2: '5', con_factura: true })],
-      sonnet.responde(['Con factura: $133.100 en efectivo o transferencia y $163.300 con tarjeta.']),
+      sonnet.responde(['Con factura: $133.100 en efectivo o transferencia y $160.300 con tarjeta.']),
     ],
     chequeo: ({ cliente }) => (cliente.length !== 1 || !/133\.100/.test(cliente[0]) ? `salió ${JSON.stringify(cliente)}` : null),
   },
