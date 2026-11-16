@@ -45,7 +45,7 @@ function usarCatalogoDelPanel(fn) {
   fuenteDelPanel = fn || (() => require('./precios-panel').obtenerCatalogo());
 }
 
-/** { productos, desactualizado }: los productos del panel y los 4 colores de granza. Nunca tira. */
+/** { productos, desactualizado }: los productos del panel y los 3 colores de granza. Nunca tira. */
 async function catalogo() {
   let panel = { productos: [] };
   try {

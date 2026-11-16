@@ -96,9 +96,9 @@ caso('errores de dominio pasan tal cual y no cobran nada', () => {
   assert.strictEqual(g.cotizarGranza({ producto: granza, m2: 5, config: CONFIG, medio: 'bitcoin' }).error, 'medio_desconocido');
 });
 
-caso('el catalogo trae los 4 colores como granza, y nunca "bolson"', () => {
+caso('el catalogo trae los 3 colores como granza (Fran, 16/11: gris Tandil, roja y blanca Mar del Plata), y nunca "bolson"', () => {
   const p = g.productosDelCatalogo();
-  assert.strictEqual(p.length, 4);
+  assert.deepStrictEqual(p.map((x) => x.nombre).sort(), ['Granza blanca Mar del Plata', 'Granza gris Tandil', 'Granza roja']);
   assert.ok(p.every((x) => g.esGranza(x) && x.unidad === 'bolsa'));
   assert.ok(!p.some((x) => /bols[oó]n/i.test(x.nombre)));
 });

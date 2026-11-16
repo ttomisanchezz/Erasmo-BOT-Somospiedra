@@ -87,3 +87,9 @@ Con factura: 133.100 = 110.000 × 1,21; 163.350 → 163.300; 290.400 = 240.000 �
 - **Sin cambiar** (decide Fran/Tomás): "precio sin producto no recibe precio". Fran pasa la granza de entrada ($22.000 la bolsa) y eso explica 88 de las diferencias.
 - `test/evaluar.js`: el caso "con factura" seguía con la granza vieja ($163.300); con $26.500 × 5 = $132.500 + 21 % = $160.325 → $160.300. Vuelve a dar 18/18.
 - `test/persistencia.test.js` falla también sin estos cambios (en la VM de Linux del chat); no se tocó.
+
+## 16/11/2026 (chat, tarde): respuestas de Fran
+
+- Granza: 3 colores (gris Tandil, roja, blanca Mar del Plata); "gris con roja" no existe (`src/granza.js`). Si no sabe si hay stock de un color, escala.
+- Reglas: precio sin producto → sacar charla (si vino del anuncio de granza, preguntar los m²); bolsón → desviar a m²; "gracias" → "No hay por qué! Cualquier cosita quedamos atentos" + invitación a pasar un presupuesto mejor ("si es mejor que el nuestro, con gusto lo mejoramos"). Erasmo no baja nada: si lo mandan, escala.
+- Pendiente de Tomás (plata / reglas heredadas): Verde Bronce $35.000 en efectivo en el panel; envío (Neuquén $30.000, alrededores $40.000, carga por viaje); mensaje al escalar ("enseguida te respondemos"); tramos de granza (15–20+ a $16.000 / $15.500).

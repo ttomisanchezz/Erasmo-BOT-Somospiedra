@@ -7,7 +7,8 @@
  * Cómo se vende (Fran y Tomás, 30/10 y 06/11):
  *  - SIEMPRE por m², en bolsas de unos 40 kg: 1 bolsa = 1 m² a 3 cm de espesor (equivalencia comercial
  *    orientativa). Nunca por bolsón: en bolsas se vende más cantidad.
- *  - Los 4 colores (blanca Mar del Plata, gris con roja, roja y gris Tandil) tienen el mismo precio.
+ *  - Los 3 colores (blanca Mar del Plata, roja y gris Tandil) tienen el mismo precio. "Gris con roja" no existe:
+ *    la gris es la gris Tandil (Fran, 16/11/2026).
  *  - El precio de cada bolsa baja según cuántas bolsas lleva (precios del 06/11, por bolsa, con dos que fijó Tomás el
  *    11/11/2026 para que coincidan con la planilla del local: 20 m² en efectivo $310.000 y 1 m² con tarjeta $26.500):
  *      efectivo / transferencia: $22.000, $20.000 y $15.500
@@ -32,7 +33,7 @@ const TRAMOS = [
 /** Una bolsa de ~40 kg cubre 1 m² a 3 cm. */
 const COBERTURA_M2_POR_BOLSA = '1';
 
-const NOMBRES = ['Granza blanca Mar del Plata', 'Granza gris con roja', 'Granza roja', 'Granza gris Tandil'];
+const NOMBRES = ['Granza blanca Mar del Plata', 'Granza roja', 'Granza gris Tandil'];
 
 /** El tramo que le toca a esa cantidad de bolsas (un entero >= 1). */
 function tramoPara(bolsas) {
@@ -46,7 +47,7 @@ function productoDelTramo(nombre, tramo) {
   return { nombre, unidad: 'bolsa', coberturaM2: COBERTURA_M2_POR_BOLSA, efectivoCentavos: tramo.efectivoCentavos, listaCentavos: tramo.listaCentavos, esGranza: true };
 }
 
-/** Los 4 colores, para el catálogo del bot (con el precio del primer tramo: la cuenta real elige el tramo). */
+/** Los 3 colores, para el catálogo del bot (con el precio del primer tramo: la cuenta real elige el tramo). */
 function productosDelCatalogo() {
   return NOMBRES.map((n) => productoDelTramo(n, TRAMOS[0]));
 }

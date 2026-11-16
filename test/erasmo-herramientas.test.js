@@ -53,7 +53,7 @@ const totalesDe = (r) => r.totales.map((t) => t.total);
   });
   await check('la granza está siempre (tabla propia), por m² en bolsas, nunca por bolsón', async () => {
     const r = await por('buscar_productos').correr({ consulta: 'granza' });
-    assert.strictEqual(r.productos.length, 4);
+    assert.strictEqual(r.productos.length, 3);
     assert.ok(r.productos.every((x) => /bolsas de unos 40 kg/.test(x.se_vende_por) && x.tiene_precio));
     assert.ok(!/bols[oó]n/i.test(JSON.stringify(r)));
   });
@@ -74,7 +74,7 @@ const totalesDe = (r) => r.totales.map((t) => t.total);
     try {
       const r = await por('buscar_productos').correr({ consulta: 'adoquines' });
       assert.deepStrictEqual(r.productos, []);
-      assert.strictEqual((await por('buscar_productos').correr({ consulta: 'granza' })).productos.length, 4);
+      assert.strictEqual((await por('buscar_productos').correr({ consulta: 'granza' })).productos.length, 3);
     } finally {
       herr.usarCatalogoDelPanel(async () => ({ ...armarCatalogo(filas), desactualizado: false }));
     }
