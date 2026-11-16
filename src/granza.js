@@ -14,9 +14,9 @@
  *      efectivo / transferencia: $22.000, $20.000 y $15.500
  *      tarjeta (un solo pago):   $26.500, $25.000 y $19.000
  *
- * SUPUESTO A CONFIRMAR CON FRAN (anotado en REVISAR.md): los tramos son de 1 a 9 bolsas, de 10 a 19 y desde 20,
- * como la estructura de la ronda 2 (30/10). Con estas bandas, 19 bolsas ($380.000 en efectivo) salen MÁS caras
- * que 20 ($310.000): el código no lo arregla, cobra el precio de la banda.
+ * Tramos: de 1 a 9 bolsas, de 10 a 14, de 15 a 19 ($16.000 en efectivo; Fran y Tomás, 16/11/2026) y desde 20.
+ * Con estas bandas, 14 bolsas ($280.000 en efectivo) salen MÁS caras que 15 ($240.000): el código no lo arregla,
+ * cobra el precio de la banda. El de 15 a 19 con tarjeta falta (FALTA DATO).
  *
  * El tramo se elige por la cantidad de BOLSAS (los m² redondeados para arriba) y ese precio vale para todas las
  * bolsas. La cuenta se hace en dos pasadas con el cotizador: la primera cuenta las bolsas, la segunda cobra.
@@ -26,7 +26,10 @@ const cotizador = require('./cotizador-piedra');
 /** Los tramos: `desde` es la primera cantidad de bolsas del tramo. Precios por bolsa, en centavos. */
 const TRAMOS = [
   { desde: 1, hasta: 9, efectivoCentavos: 2200000, listaCentavos: 2650000 },
-  { desde: 10, hasta: 19, efectivoCentavos: 2000000, listaCentavos: 2500000 },
+  { desde: 10, hasta: 14, efectivoCentavos: 2000000, listaCentavos: 2500000 },
+  // 15 a 19 bolsas a $16.000 (Fran y Tomás, 16/11/2026). El precio con tarjeta de este tramo NO lo pasaron:
+  // FALTA DATO (null), nunca uno estimado. Erasmo da solo el efectivo; con tarjeta escala.
+  { desde: 15, hasta: 19, efectivoCentavos: 1600000, listaCentavos: null },
   { desde: 20, hasta: null, efectivoCentavos: 1550000, listaCentavos: 1900000 },
 ];
 
@@ -70,7 +73,7 @@ function cotizarGranza({ producto, m2, cantidad, config = {}, medio, factura, cu
   if (r.ok) {
     r.bolsas = bolsas;
     r.tramo = { desde: tramo.desde, hasta: tramo.hasta };
-    r.supuestos = [...(r.supuestos || []), 'tramos_granza_1-9_10-19_20+'];
+    r.supuestos = [...(r.supuestos || []), 'tramos_granza_1-9_10-14_15-19_20+'];
   }
   return r;
 }

@@ -257,7 +257,11 @@ const COTIZAR = {
     if (cubre > M2_MAXIMO) return falla(`Más de ${M2_MAXIMO} m²: es una obra grande y la ve una persona. Escalá.`);
 
     // Qué columnas se muestran: las dos, o la de la forma de pago.
-    const columnas = forma ? [forma.columna] : ['efectivo', 'lista'];
+    let columnas = forma ? [forma.columna] : ['efectivo', 'lista'];
+    // Sin forma de pago y sin el precio con tarjeta (granza de 15 a 19 bolsas, 16/11/2026): sale solo el efectivo
+    // y Erasmo no dice nada de la tarjeta. Si el cliente paga con tarjeta, `cotizar` con esa forma da FALTA DATO.
+    const sinTarjeta = esGranza && !forma && r.efectivo && r.efectivo.ok && !(r.lista && r.lista.ok);
+    if (sinTarjeta) columnas = ['efectivo'];
     const totales = [];
     for (const col of columnas) {
       const c = col === 'lista' ? r.lista : r.efectivo;
@@ -293,6 +297,7 @@ const COTIZAR = {
       cantidad: cantidadTexto,
       ...(r.m2Cubiertos !== undefined && !esGranza ? { m2_que_cubre: `${decimalComoTexto(r.m2Cubiertos)} m²` } : {}),
       factura: factura ? 'CON factura (IVA 21 % incluido en los totales)' : 'SIN factura',
+      ...(sinTarjeta ? { aviso_tarjeta: 'El precio con tarjeta de esta cantidad no está cargado: no lo digas ni digas que no está. Pasá solo el total en efectivo o transferencia; si paga con tarjeta, escalá.' } : {}),
       totales: totales.map((t) => ({ forma_de_pago: etiqueta[t.col], total: cotizador.formatearPesos(t.centavos) })),
       ...(porUnidad
         ? {

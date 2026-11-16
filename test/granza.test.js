@@ -19,11 +19,13 @@ const cuenta = (m2) => g.cotizarGranza({ producto: granza, m2, config: CONFIG })
 console.log('granza');
 
 caso('la tabla de tramos esta en un solo lugar: la del 06/11 con los dos precios que fijo Tomas el 11/11 (20 m2 en efectivo $310.000, 1 m2 con tarjeta $26.500)', () => {
-  assert.deepStrictEqual(g.TRAMOS.map((t) => [t.desde, t.efectivoCentavos / 100, t.listaCentavos / 100]), [[1, 22000, 26500], [10, 20000, 25000], [20, 15500, 19000]]);
+  assert.deepStrictEqual(g.TRAMOS.map((t) => [t.desde, t.efectivoCentavos / 100, t.listaCentavos === null ? null : t.listaCentavos / 100]), [[1, 22000, 26500], [10, 20000, 25000], [15, 16000, null], [20, 15500, 19000]]);
   assert.strictEqual(g.tramoPara(1).desde, 1);
   assert.strictEqual(g.tramoPara(9).desde, 1);
   assert.strictEqual(g.tramoPara(10).desde, 10);
-  assert.strictEqual(g.tramoPara(19).desde, 10);
+  assert.strictEqual(g.tramoPara(14).desde, 10);
+  assert.strictEqual(g.tramoPara(15).desde, 15);
+  assert.strictEqual(g.tramoPara(19).desde, 15);
   assert.strictEqual(g.tramoPara(20).desde, 20);
   assert.strictEqual(g.tramoPara(250).desde, 20);
   assert.strictEqual(g.tramoPara(0), null);
@@ -39,10 +41,10 @@ caso('5 m2: 5 bolsas, tramo 1-9: efectivo 110.000 / tarjeta 132.500; con factura
   assert.deepStrictEqual([pesos(r.efectivo.conFactura.totalCentavos), pesos(r.lista.conFactura.totalCentavos)], ['$133.100', '$160.300']);
 });
 
-caso('12 m2: 12 bolsas, tramo 10-19: 240.000 / 300.000; con factura 290.400 / 363.000', () => {
+caso('12 m2: 12 bolsas, tramo 10-14: 240.000 / 300.000; con factura 290.400 / 363.000', () => {
   const r = cuenta(12);
   assert.strictEqual(r.bolsas, 12);
-  assert.deepStrictEqual(r.tramo, { desde: 10, hasta: 19 });
+  assert.deepStrictEqual(r.tramo, { desde: 10, hasta: 14 });
   assert.deepStrictEqual([pesos(r.efectivo.totalCentavos), pesos(r.lista.totalCentavos)], ['$240.000', '$300.000']);
   assert.deepStrictEqual([pesos(r.efectivo.conFactura.totalCentavos), pesos(r.lista.conFactura.totalCentavos)], ['$290.400', '$363.000']);
 });
@@ -67,9 +69,16 @@ caso('el tramo se elige por bolsas: 9,2 m2 son 10 bolsas y entran al tramo de 10
   assert.strictEqual(pesos(r.efectivo.totalCentavos), '$200.000');
 });
 
-caso('el limite de los tramos: 9 y 10 bolsas, 19 y 20 bolsas (19 sale mas caro que 20: se cobra la banda)', () => {
+caso('el limite de los tramos (Tomas, 16/11: 15 a 19 bolsas a $16.000): 9, 10, 14, 15, 19 y 20 bolsas (14 sale mas caro que 15: se cobra la banda)', () => {
   const total = (n) => g.cotizarGranza({ producto: granza, cantidad: n, config: CONFIG }).efectivo.totalCentavos / 100;
-  assert.deepStrictEqual([9, 10, 19, 20].map(total), [198000, 200000, 380000, 310000]);
+  assert.deepStrictEqual([9, 10, 14, 15, 19, 20].map(total), [198000, 200000, 280000, 240000, 304000, 310000]);
+});
+
+caso('15 a 19 bolsas: el precio con tarjeta no esta (FALTA DATO), el de efectivo si', () => {
+  const r = g.cotizarGranza({ producto: granza, cantidad: 16, config: CONFIG });
+  assert.strictEqual(r.efectivo.totalCentavos / 100, 256000);
+  assert.strictEqual(r.lista.ok, false);
+  assert.deepStrictEqual(r.lista.faltaDato, ['listaCentavos']);
 });
 
 caso('los dos precios que fijo Tomas el 11/11: 20 m2 en efectivo $310.000 y 1 m2 con tarjeta $26.500', () => {
