@@ -224,7 +224,8 @@ function silencio(chatId, { motivo, lineas = [], ...extra }) {
  * Evento `entrega` (bloque Ninjo 2, punto 3.1): un mensaje que salió a un cliente (nunca al grupo),
  * después de que Evolution contestó. `id`: el `key.id` que devolvió (null si no vino); `formato`:
  * 'texto', 'documento' o 'imagen' (no `tipo`: ese es el del evento); `origen`: 'sonnet', 'bot',
- * 'seguimiento', 'silencio', 'sigue' o 'fotos'; `texto`: lo que salió (en un documento, el epígrafe);
+ * 'seguimiento', 'silencio', 'sigue', 'fotos' o 'escalado' (el "Enseguida te respondemos." que manda el código
+ * al escalar, 16/11/2026); `texto`: lo que salió (en un documento, el epígrafe);
  * `tanda`: la de la propuesta, o null. Si el envío falló o Evolution lo frenó, el mismo evento con
  * `error` (corto, sin rutas) y sin id.
  */

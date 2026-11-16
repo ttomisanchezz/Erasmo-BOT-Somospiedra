@@ -16,8 +16,9 @@
  * El pedido (`pensar`): las instrucciones de `cerebro-reglas.md` (con cache_control), lo que sabe el estado,
  * las líneas de una persona de la cuenta, las últimas líneas del historial (completado con Evolution por
  * contexto.js, lo llama index.js), la tanda y, en vivo, las fotos del cliente. Sonnet termina con una de
- * dos herramientas: `responder` (de 1 a 4 mensajes) o `escalar` (no le llega nada al cliente; el motivo va
- * al grupo). Lo que no termina así cuenta como escalar.
+ * dos herramientas: `responder` (de 1 a 4 mensajes) o `escalar` (Sonnet no le manda nada al cliente; el motivo
+ * va al grupo, y el código le manda una vez el mensaje fijo "Enseguida te respondemos.": index.js,
+ * `escalarEnSilencio`, 16/11/2026). Lo que no termina así cuenta como escalar.
  *
  * Herramientas de datos (src/herramientas-erasmo.js): `buscar_productos`, `cotizar`, `mandar_catalogo` y
  * `agendar_seguimiento`. Cada una trae su definición para la API y una función que corre con el input y el

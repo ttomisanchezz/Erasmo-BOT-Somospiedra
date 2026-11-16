@@ -56,12 +56,33 @@ const hoy = armar.diaDe(Date.now());
     // El catálogo y lo que salió de verdad.
     assert.match(md, /- `mandar_catalogo` \{\} → ok: va con los mensajes/);
     assert.match(md, /- Salió: documento \(catálogo en PDF\)/);
-    // La escalada.
-    assert.match(md, /\*\*Erasmo escaló\*\* \(al cliente no le llegó nada\): pide envío a Plottier, adoquines ojito 10 m²/);
+    // La escalada: al cliente le llegó solo el mensaje fijo del código (16/11/2026), y figura como lo que salió.
+    assert.match(md, /\*\*Erasmo escaló\*\* \(al cliente solo le llegó "Enseguida te respondemos\."\): pide envío a Plottier, adoquines ojito 10 m²/);
+    assert.match(md, /- Salió: texto · "Enseguida te respondemos\."/);
     // La ficha y el costo.
     assert.match(md, /## Ficha del chat[\s\S]*En qué quedó: escaló: pide envío a Plottier/);
     assert.match(md, /Reglas del cerebro: [0-9a-f]{8}/);
     assert.match(md, /<sub>US\$/);
+  });
+  await check('una escalada sin el mensaje fijo (Sonnet falló, borrador, registros de antes del 16/11) sigue diciendo que no le llegó nada', async () => {
+    const eventos = [
+      { tipo: 'cliente', ts: `${hoy}T15:00:00.000Z`, id: 'A1', texto: 'hacen envios?' },
+      { tipo: 'propuesta', ts: `${hoy}T15:00:30.000Z`, tanda: 'T1', lineas: ['A1'], mensajes: [], escalar: true, motivo: 'pide envío' },
+      { tipo: 'silencio', ts: `${hoy}T15:00:31.000Z`, tanda: 'T1', motivo: 'escalo', lineas: ['A1'] },
+    ];
+    const sin = armar.armarMarkdown({ eventos, fecha: hoy, ultimos4: '5806' });
+    assert.match(sin, /\*\*Erasmo escaló\*\* \(al cliente no le llegó nada\): pide envío/);
+    // Si el envío del mensaje fijo falló, tampoco le llegó.
+    const fallido = { tipo: 'entrega', ts: `${hoy}T15:00:32.000Z`, tanda: 'T1', formato: 'texto', origen: 'escalado', texto: 'Enseguida te respondemos.', error: 'Evolution 500' };
+    const conError = armar.armarMarkdown({ eventos: [...eventos, fallido], fecha: hoy, ultimos4: '5806' });
+    assert.match(conError, /\*\*Erasmo escaló\*\* \(al cliente no le llegó nada\): pide envío/);
+    assert.match(conError, /NO salió: Evolution 500/);
+    // Sin el id de Evolution no se sabe si le llegó: tampoco se afirma.
+    const sinId = armar.armarMarkdown({ eventos: [...eventos, { ...fallido, error: undefined, id: null }], fecha: hoy, ultimos4: '5806' });
+    assert.match(sinId, /\*\*Erasmo escaló\*\* \(al cliente no le llegó nada\): pide envío/);
+    // Con el id, sí.
+    const conId = armar.armarMarkdown({ eventos: [...eventos, { ...fallido, error: undefined, id: 'EV1' }], fecha: hoy, ultimos4: '5806' });
+    assert.match(conId, /\*\*Erasmo escaló\*\* \(al cliente solo le llegó "Enseguida te respondemos\."\): pide envío/);
   });
   await check('lo que el cliente escribió y no entró a una tanda va aparte, con el motivo', async () => {
     const otro = '5490000008001';

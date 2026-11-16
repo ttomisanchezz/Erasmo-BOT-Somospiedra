@@ -149,11 +149,11 @@ const nuevo = () => `54900000${String(++n).padStart(5, '0')}`;
     assert.deepStrictEqual(alGrupo, []);
   });
 
-  await check('un pedido del catálogo sin texto escala en silencio con el nombre del producto', async () => {
+  await check('un pedido del catálogo sin texto escala con el nombre del producto; al cliente solo "Enseguida te respondemos."', async () => {
     const num = nuevo();
     await bot.procesar(mensaje(num, '', { message: { orderMessage: { orderTitle: 'Laja patagónica' } } }));
     assert.strictEqual(sonnet.pedidos.length, 0);
-    assert.deepStrictEqual(aClientes, []);
+    assert.deepStrictEqual(aClientes, [{ numero: jid(num), texto: 'Enseguida te respondemos.' }]);
     assert.match(alGrupo[0], /pedido del catálogo de WhatsApp: Laja patagónica/);
   });
 

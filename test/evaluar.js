@@ -9,7 +9,8 @@
  * Cada caso es una conversación con las respuestas de Sonnet "enlatadas" (lo que contestaría la API, como
  * tool_use de `responder`, `escalar` o las herramientas de datos), pasada por el bot de verdad (index.js
  * `procesar`, con Evolution de mentira). Se revisan dos cosas:
- *   1. lo propio de cada caso (escala, sale tal cosa, no sale nada);
+ *   1. lo propio de cada caso (escala, sale tal cosa, no sale nada). Al escalar, al cliente le llega solo el
+ *      mensaje fijo del código, "Enseguida te respondemos." (Tomás y Fran, 16/11/2026);
  *   2. las REGLAS GLOBALES, en toda respuesta: como mucho 4 mensajes por tanda, cada uno de hasta 300
  *      caracteres, ningún monto que no haya devuelto una herramienta en esa tanda (09/11/2026: antes era
  *      ninguno), y nunca la promesa de que otra persona lo va a contactar.
@@ -26,6 +27,10 @@ fs.writeFileSync(path.join(process.env.DOCS_DIR, 'Catalogo-Somos-Piedra-2026_3.p
 const enDias = (n) => new Date(Date.now() + n * 86400000 - 3 * 3600000).toISOString().slice(0, 10);
 
 const VERBOSO = process.argv.includes('-v');
+// Lo único que recibe el cliente cuando Erasmo le pasa el chat al equipo. El texto exacto, escrito a mano.
+const AVISO_ESCALADO = 'Enseguida te respondemos.';
+/** Al escalar: ¿le llegó solo el mensaje fijo, una vez? Devuelve el problema o null. */
+const soloElAviso = (cliente) => (cliente.length === 1 && cliente[0] === AVISO_ESCALADO ? null : `le llegó ${JSON.stringify(cliente)}`);
 const MIN = 60 * 1000;
 
 let n = 900;
@@ -83,18 +88,19 @@ const CASOS = [
     chequeo: ({ cliente, pedidos }) => (cliente.join() !== 'Te sale $240.000, sin factura.' ? `salió ${JSON.stringify(cliente)}` : pedidos !== 3 ? `hubo ${pedidos} pedidos` : null),
   },
   {
-    nombre: 'un producto que no está en la lista: cotizar da error y escala, el cliente no recibe nada',
+    nombre: 'un producto que no está en la lista: cotizar da error y escala, el cliente solo recibe "Enseguida te respondemos."',
     pasos: [{ c: 'cuanto sale el marmol de carrara 4 m2?' }],
     sonnet: [[sonnet.usar('cotizar', { producto: 'Mármol de Carrara', m2: '4' })], sonnet.escala('pide mármol de Carrara, no está en la lista')],
     chequeo: ({ cliente, grupo, s }) =>
-      cliente.length ? `le llegó ${JSON.stringify(cliente)}` : !grupo.some((t) => /🔕/.test(t) && /Carrara/.test(t)) ? 'no avisó al grupo' : !s.escalado ? 'no quedó escalado' : null,
+      soloElAviso(cliente) || (!grupo.some((t) => /🔕/.test(t) && /Carrara/.test(t)) ? 'no avisó al grupo' : !s.escalado ? 'no quedó escalado' : null),
   },
   {
-    nombre: 'pide envío: escala en silencio con el dato (al cliente nada, 🔕 al grupo con el motivo)',
-    pasos: [{ c: 'hacen envios a plottier? son 12 m2 de granza roja' }],
+    nombre: 'pide envío: escala con el dato (al cliente solo "Enseguida te respondemos.", una vez; 🔕 al grupo con el motivo)',
+    pasos: [{ c: 'hacen envios a plottier? son 12 m2 de granza roja' }, { c: 'hola??' }],
     sonnet: [sonnet.escala('pide envío a Plottier, granza roja 12 m²')],
-    chequeo: ({ cliente, grupo, s }) =>
-      cliente.length ? `le llegó ${JSON.stringify(cliente)}` : !grupo.some((t) => /🔕/.test(t) && /Plottier/.test(t)) ? 'no avisó al grupo' : !s.escalado ? 'no quedó escalado' : null,
+    chequeo: ({ cliente, grupo, s, pedidos }) =>
+      soloElAviso(cliente) ||
+      (pedidos !== 1 ? `hubo ${pedidos} pedidos` : !grupo.some((t) => /🔕/.test(t) && /Plottier/.test(t)) ? 'no avisó al grupo' : !s.escalado ? 'no quedó escalado' : null),
   },
   {
     nombre: 'quiere ver las piedras: avisa que le manda el catálogo y el PDF sale después de los textos',
@@ -137,10 +143,10 @@ const CASOS = [
     chequeo: ({ cliente, pedidos }) => (pedidos !== 2 ? `hubo ${pedidos} pedidos` : cliente.join() !== 'te cuento: es piedra natural de la zona' ? `salió ${JSON.stringify(cliente)}` : null),
   },
   {
-    nombre: 'un monto inventado (sin cotizar): frena dos veces y escala, no sale ningún monto',
+    nombre: 'un monto inventado (sin cotizar): frena dos veces y escala, no sale ningún monto (solo "Enseguida te respondemos.")',
     pasos: [{ c: 'cuanto sale la bolsa de granza?' }],
     sonnet: [sonnet.responde(['la bolsa sale $8.500']), sonnet.responde(['sale 8500 la bolsa'])],
-    chequeo: ({ cliente, grupo }) => (cliente.length ? `le llegó ${JSON.stringify(cliente)}` : !grupo.some((t) => /guardia: .*monto/.test(t)) ? 'no escaló por la guardia' : null),
+    chequeo: ({ cliente, grupo }) => soloElAviso(cliente) || (!grupo.some((t) => /guardia: .*monto/.test(t)) ? 'no escaló por la guardia' : null),
   },
   {
     nombre: 'un monto escrito sin cotizar y corregido: sale lo corregido, sin monto',
@@ -155,7 +161,7 @@ const CASOS = [
     chequeo: ({ cliente, grupo, pedidos }) => (pedidos ? 'le preguntó a Sonnet' : cliente.length || grupo.length ? 'salió algo' : null),
   },
   {
-    nombre: 'Sonnet no responde: silencio con el cliente y aviso al grupo',
+    nombre: 'Sonnet no responde: silencio con el cliente (ni el mensaje fijo: ese escalado no calla) y aviso al grupo',
     pasos: [{ c: 'hola, hacen envios?' }],
     sonnet: [sonnet.falla(500), sonnet.falla(500)],
     chequeo: ({ cliente, grupo }) => (cliente.length ? `le llegó ${JSON.stringify(cliente)}` : !grupo.some((t) => /Sonnet no pudo contestar/.test(t)) ? 'no avisó al grupo' : null),

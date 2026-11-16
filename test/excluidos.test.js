@@ -697,6 +697,25 @@ async function caso(nombre, fn) {
     assert.strictEqual(p.eventos(N, 'silencio').filter((e) => e.motivo === 'excluido').length, 1);
   });
 
+  // (c2) el mensaje fijo del escalado ("Enseguida te respondemos.", 16/11/2026): el control de antes de mandarlo.
+  await caso('freno (c2): un #excluir cuando el escalado ya avisó al grupo: el "Enseguida te respondemos." no sale', async () => {
+    const control = '5490000000229';
+    const N = '5490000000230';
+    // 300 ms de espera antes del envío: el #excluir entra con margen aunque la máquina esté cargada.
+    config.ritmo.entreMensajesMs = 300;
+    // El control: sin el #excluir, pasada la espera sale.
+    sonnet.guion(sonnet.escala('pide envío a Plottier'), sonnet.escala('pide envío a Centenario'));
+    await bot.procesar(mensaje(control, 'hacen envios a plottier?'));
+    assert.deepStrictEqual(aClientes, [{ numero: jid(control), texto: 'Enseguida te respondemos.' }], 'el caso no prueba nada: sin excluir no salió');
+    aClientes.length = 0;
+    alGrupo.length = 0;
+    const tanda = bot.procesar(mensaje(N, 'hacen envios a centenario?'));
+    assert.ok(await p.esperar(() => alGrupo.some((t) => /🔕 SIN RESPUESTA/.test(t))), 'no escaló');
+    await enGrupo(`#excluir ${N}`);
+    await tanda;
+    assert.strictEqual(aClientes.length, 0, 'le llegó el mensaje fijo a un excluido');
+  });
+
   // (e) contestarConSonnet: después de completar el contexto y antes de pensar.
   await caso('freno (e): un #excluir mientras se completa el contexto no llega a Sonnet', async () => {
     const N = '5490000000226';

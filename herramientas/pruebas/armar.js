@@ -120,7 +120,10 @@ function armarMarkdown({ eventos, fecha, ultimos4, ficha = null, generado = new 
     out.push(suyas.length ? suyas.map((c) => cita(`${c.texto}${c.audio ? '  [audio transcripto]' : ''}`)).join('\n') : '> (sin texto: foto o pedido del catálogo)');
     out.push('');
     if (e.escalar) {
-      out.push(`**Erasmo escaló** (al cliente no le llegó nada): ${e.motivo || '(sin motivo)'}`);
+      // Al escalar, lo único que le puede llegar al cliente es el mensaje fijo del código (16/11/2026): si salió,
+      // está su `entrega` de origen 'escalado' en esta tanda, con el id que devolvió Evolution y sin error.
+      const aviso = eventos.find((x) => x.tipo === 'entrega' && x.tanda === e.tanda && x.origen === 'escalado' && x.id && !x.error);
+      out.push(`**Erasmo escaló** (${aviso ? `al cliente solo le llegó "${aviso.texto}"` : 'al cliente no le llegó nada'}): ${e.motivo || '(sin motivo)'}`);
     } else if ((e.mensajes || []).length) {
       out.push('**Erasmo contestó:**');
       out.push('');

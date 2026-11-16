@@ -5,7 +5,8 @@
  *  - cotizar + responder: el monto sale de la herramienta y la guardia lo deja pasar; queda en el registro y en la ficha;
  *  - el catálogo en PDF sale DESPUÉS de los textos, por el mismo camino (el eco no calla el chat), una vez cada 24 h;
  *  - el seguimiento se anota solo si la respuesta salió, y ese día sale UN aviso al grupo;
- *  - los avisos al grupo de afuera de la franja (9 a 20) se juntan y salen en un solo mensaje;
+ *  - los avisos al grupo de afuera de la franja (9 a 20) se juntan y salen en un solo mensaje (el "Enseguida te
+ *    respondemos." de un escalado le sale al cliente igual, a cualquier hora);
  *  - los candados de evolution.enviarDocumento (escucha, borrador, listas, excluidos).
  */
 const fs = require('fs');
@@ -136,11 +137,11 @@ const alCliente = (num) => aClientes.filter((m) => m.numero === jid(num)).map((m
     await bot.procesar(mensaje(num, 'precio adoquin ojito 10 m2 efectivo'));
     assert.deepStrictEqual(alCliente(num), ['Te sale $780.000, sin factura.']);
   });
-  await check('cotizar con error (FALTA DATO o un producto que no está): Sonnet escala y el cliente no recibe nada', async () => {
+  await check('cotizar con error (FALTA DATO o un producto que no está): Sonnet escala y el cliente solo recibe "Enseguida te respondemos."', async () => {
     const num = deTester();
     sonnet.guion([sonnet.usar('cotizar', { producto: 'Mármol de Carrara', m2: '4' })], sonnet.escala('pide mármol de Carrara, no está en la lista'));
     await bot.procesar(mensaje(num, 'cuanto sale el marmol de carrara 4 m2'));
-    assert.deepStrictEqual(alCliente(num), []);
+    assert.deepStrictEqual(alCliente(num), ['Enseguida te respondemos.']);
     assert.ok(alGrupo.some((t) => /mármol de Carrara/.test(t)));
     assert.match(state.todos()[jid(num)].ficha.quedo, /^escaló/);
   });
@@ -173,11 +174,11 @@ const alCliente = (num) => aClientes.filter((m) => m.numero === jid(num)).map((m
     await bot.procesar(mensaje(num, 'me lo mandás de nuevo? no lo encuentro'));
     assert.strictEqual(alCliente(num).filter((t) => t === '[documento]').length, 2);
   });
-  await check('si el turno termina en escalar, el catálogo no sale ni se marca', async () => {
+  await check('si el turno termina en escalar, el catálogo no sale ni se marca (al cliente solo "Enseguida te respondemos.")', async () => {
     const num = deTester();
     sonnet.guion([sonnet.usar('mandar_catalogo', {})], sonnet.escala('pide envío a Cipolletti'));
     await bot.procesar(mensaje(num, 'mandame el catalogo y decime si envian a cipolletti'));
-    assert.deepStrictEqual(alCliente(num), []);
+    assert.deepStrictEqual(alCliente(num), ['Enseguida te respondemos.']);
     assert.strictEqual(state.todos()[jid(num)].catalogoEnviado, undefined);
   });
   await check('promete el catálogo sin llamar a la herramienta: la guardia lo frena', async () => {
@@ -400,6 +401,26 @@ const alCliente = (num) => aClientes.filter((m) => m.numero === jid(num)).map((m
       }
       assert.deepStrictEqual(state.colaAvisos(), []);
     });
+  });
+  await check('escalar de noche: el 🔕 espera en la cola hasta las 9, pero "Enseguida te respondemos." le sale al cliente en el momento', async () => {
+    const num = deTester();
+    const deMentira = evolution.avisarGrupo;
+    evolution.avisarGrupo = real.avisarGrupo;
+    try {
+      await conFranja(AFUERA, async () => {
+        state.guardarColaAvisos([]);
+        sonnet.guion(sonnet.escala('pide envío a Plottier'));
+        await bot.procesar(mensaje(num, 'hacen envios a plottier?'));
+        assert.deepStrictEqual(alCliente(num), ['Enseguida te respondemos.']);
+        assert.deepStrictEqual(alGrupo, [], 'el aviso salió afuera de la franja');
+        assert.strictEqual(state.colaAvisos().length, 1);
+        assert.match(JSON.stringify(state.colaAvisos()[0]), /SIN RESPUESTA[\s\S]*pide envío a Plottier/);
+        assert.strictEqual(state.todos()[jid(num)].escalado, true);
+      });
+    } finally {
+      evolution.avisarGrupo = deMentira;
+      state.guardarColaAvisos([]);
+    }
   });
 
   fin();

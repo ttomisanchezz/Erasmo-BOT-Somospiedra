@@ -33,8 +33,11 @@ haya reglas aprobadas, **escala todo**. Lo de iPhone está en `_heredado-iphone/
 
 - **Los montos nunca los produce la IA**: salen del panel (Supabase) o de la tabla de la granza y los calcula
   el código (`cotizar`). La guardia frena **cualquier** monto que no haya devuelto `cotizar` en esa misma respuesta.
-- **Si no sabe cómo seguir: silencio con el cliente y aviso al grupo interno** (escalar).
-- **El bot nunca promete que otra persona va a contactar al cliente** (ni que va a volver a escribir).
+- **Si no sabe cómo seguir: Erasmo no le contesta al cliente y avisa al grupo interno** (escalar).
+- **El bot nunca promete que otra persona va a contactar al cliente** (ni que va a volver a escribir), **salvo un
+  único mensaje fijo, que no escribe Sonnet sino el código**: cuando Erasmo le pasa el chat al equipo, el cliente
+  recibe UNA vez el texto exacto "Enseguida te respondemos." (decisión de Tomás y Fran, 16/11/2026; ver "Al escalar"
+  más abajo). Sonnet sigue sin poder prometer nada: la guardia no cambió.
 - **Tope de 4 mensajes por tanda, de 300 caracteres como máximo cada uno** (del 4º en adelante van juntos en el 4º).
 
 ## Quién contesta: `CEREBRO_MODO`
@@ -61,7 +64,31 @@ recordatorios internos del grupo. **Los avisos al grupo "Bot Erasmo" salen de 9 
 
 **Si Sonnet falla** (error de la API, timeout, sin `ANTHROPIC_API_KEY`) **no hay respaldo**: se escala en
 silencio ("Sonnet no pudo contestar (…)" en el 🔕 del grupo), sin callar el chat (el próximo mensaje se
-vuelve a intentar). Lo prueba `test/piedra-sonnet.test.js`.
+vuelve a intentar) y sin el mensaje fijo al cliente. Lo prueba `test/piedra-sonnet.test.js`.
+
+**Al escalar, el cliente recibe UNA vez "Enseguida te respondemos."** (decisión de Tomás y Fran, 16/11/2026; hasta
+ese día no le llegaba nada). Lo manda el código, no Sonnet: `escalarEnSilencio` → `avisarAlClienteDelEscalado` en
+`src/index.js` (el texto es `AVISO_ESCALADO`).
+- Solo con un escalado que calla el chat (Sonnet llamó `escalar`, la guardia frenó dos veces, todo lo que iba a
+  decir ya estaba dicho, un pedido del catálogo sin texto). **No** sale cuando el escalado no calla: Sonnet falló o
+  un audio no se entendió.
+- Solo si el aviso al grupo salió (de noche queda en la cola de las 9 y vale como salido: al cliente le sale igual,
+  a cualquier hora) y solo cuando el chat pasa de no escalado a escalado. Con el chat ya escalado y callado, o con
+  el mismo motivo dentro de `SILENCIO_TRAS_HUMANO_MIN`, no sale de nuevo. Después de un `#sigue`, de que lo tome una
+  persona o de las 24 h, un escalado nuevo vuelve a avisar.
+- Candados: en escucha, nada; en borrador o fuera de las listas (`leLlegaAlCliente`), al cliente nada y el texto va
+  en el mismo 🔕 marcado BORRADOR; con `#apagar`, un excluido, `#pausa`, una persona de la cuenta que escribió
+  mientras Sonnet pensaba o un `#sigue` que reactivó el chat antes del envío, tampoco (`frenoDelAvisoDeEscalado`: se
+  mira antes del "escribiendo…" y otra vez, pasada la espera del ritmo, justo antes de mandar). Un `#reset` en ese
+  rato corta la tanda como siempre.
+- No se agrega al historial ni a `botEnvio` (como el "🔄 Reiniciado"): lo último del chat sigue siendo lo que dejó
+  escrito el cliente (`#sigue` se lo contesta) y un escalado sigue sin contar como "el bot le mandó algo" para
+  `#vendido` / `#perdido`. Queda en el registro como una `entrega` de origen `escalado`, con su tanda (`npm run
+  pruebas` lo muestra). Su eco no cuenta como una persona de la cuenta: no "toma" el escalado.
+- El 🔕 del grupo sigue diciendo "Al cliente no le contesté nada: escribile vos" (ver "Pendientes de decisión").
+- Tests: `test/piedra-control.test.js` (el bloque "Enseguida te respondemos."; cada candado verificado con
+  mutaciones), `piedra-sonnet`, `piedra-tandas`, `excluidos` (freno c2), `erasmo-tester` (de noche), `pruebas` y
+  los casos de `test/evaluar.js`.
 
 ## El cerebro (`src/cerebro.js` + `src/cerebro-reglas.md`)
 
@@ -142,7 +169,8 @@ Cómo prenderlo: `PRENDER-TESTER.md`. Qué revisar (cuentas y decisiones de plat
   interna, `colaAvisos`, tope 200) lo que se genera afuera de la franja (hora de Argentina) y un barrido de 1 minuto lo
   manda junto, en un solo mensaje (o los mínimos), y lo saca de la cola solo después de que salió. `avisarGrupo(texto,
   { inmediato: true })` sale ya: respuestas a comandos del grupo (`#excluir`, `#pausa`, `#vendido`, `#sonnet`…),
-  el guardián y el estado dañado. Los escalamientos siguen siendo callados para el cliente.
+  el guardián y el estado dañado. Un escalado de noche deja su 🔕 en la cola, pero el "Enseguida te respondemos."
+  le sale al cliente en el momento (ver "Al escalar").
 - **Ficha** (`src/ficha.js`): en `s.ficha`, armada por el código: de qué anuncio vino, qué pidió (lo último cotizado),
   su último mensaje, en qué quedó, seguimiento y catálogo enviado.
 - `quienAtiende` con `tester`: el que no está en `NUMEROS_TESTER` es `nadie`, antes de mirar `atiendeSonnet`.
@@ -211,7 +239,8 @@ Cómo prenderlo: `PRENDER-TESTER.md`. Qué revisar (cuentas y decisiones de plat
   al bot `SILENCIO_TRAS_HUMANO_MIN` (45); vencido, el barrido del silencio (`revisarSilencios`) le contesta
   lo que quedó (vía Sonnet).
 - Escalado callado (`src/control.js`): el chat queda callado hasta que alguien lo tome; un solo ⏰ al grupo
-  si el cliente escribió después; pasadas 24 h es consulta nueva. Datos viejos (72 h): consulta nueva.
+  si el cliente escribió después; pasadas 24 h es consulta nueva. Datos viejos (72 h): consulta nueva. Al
+  escalar, lo único que recibe el cliente es el "Enseguida te respondemos." del código, una vez (ver "Al escalar").
 - Chat sin número (`@lid`): no se procesa; 📵 al grupo sin el texto. `CONTACTOS_PERSONALES` y los excluidos
   por comando (`#excluir`): se ignoran enteros.
 - El webhook no le cree a cualquiera: secreto en la ruta (`WEBHOOK_SECRETO`, 401), tope por minuto (429),
@@ -293,3 +322,8 @@ audios), `MODO_ESCUCHA`, `MODO_BORRADOR`, `NUMEROS_TESTER`, `NUMEROS_PILOTO`, `C
 - Conectar `enviarGenerado` al cerebro (`simular_piedra`, `presupuesto_pdf`): fase F2 de la spec del simulador.
 - Si `#vendido` / `#perdido` / `#recordar` / `#pausa` tienen que valer en el chat de un excluido (hoy solo avisan
   con un ❓ en el grupo y no hacen nada).
+- "Enseguida te respondemos." (16/11/2026): si el 🔕 del grupo tiene que decir que al cliente ya se le avisó (hoy
+  dice "Al cliente no le contesté nada: escribile vos"), si el mensaje tiene que verlo Sonnet en el historial y
+  contar para `#vendido` (hoy no), si la guardia tiene que frenar esa frase cuando la escribe Sonnet (hoy la deja
+  pasar; por eso `cerebro-reglas.md` no la cita) y `reglas/cerebro-reglas-piedra.md` (las reglas aprobadas el
+  06/11), que sigue diciendo "al cliente no le llega nada": ver `REVISAR.md`.

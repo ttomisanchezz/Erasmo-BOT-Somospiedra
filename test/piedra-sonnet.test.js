@@ -7,7 +7,8 @@
  *   2. El pedido: solo `responder` y `escalar`, las reglas de Piedra, sin el número del cliente.
  *   3. `responder` sale al cliente (tope de 4 mensajes de 300 como máximo, del 4º en adelante juntos).
  *   4. Cualquier monto frena: Sonnet tiene una vuelta para corregir; si vuelve a frenar, escala callado.
- *   5. `escalar`: al cliente nada, 🔕 al grupo, el chat queda callado y lo que sigue no llama a Sonnet.
+ *   5. `escalar`: al cliente UNA vez el mensaje fijo "Enseguida te respondemos." (lo manda el código; Tomás y
+ *      Fran, 16/11/2026), 🔕 al grupo, el chat queda callado y lo que sigue no llama a Sonnet ni lo repite.
  *   6. Sonnet falla (500, timeout, sin clave): silencio con el cliente y aviso al grupo, sin respaldo.
  *   7. Lo que ya se le dijo no se repite: si todo es repetido, escala.
  *   8. Una pregunta que ya hizo en el chat no se repite: sale lo demás, sin la pregunta (11/11/2026).
@@ -17,6 +18,10 @@
 const assert = require('assert');
 const p = require('./piedra-ayuda')({ CEREBRO_MODO: 'todos' });
 const { bot, config, sonnet, aClientes, alGrupo, mensaje, state, jid, eventos, check } = p;
+
+// El único mensaje que el código le manda al cliente cuando le pasa el chat al equipo (16/11/2026). Va escrito
+// acá a mano, a propósito: es el texto exacto que decidieron Tomás y Fran.
+const AVISO_ESCALADO = 'Enseguida te respondemos.';
 
 let n = 100;
 const nuevo = () => `54900000${String(++n).padStart(5, '0')}`;
@@ -128,11 +133,11 @@ const nuevo = () => `54900000${String(++n).padStart(5, '0')}`;
     ['4 cifras peladas', 'te queda en 15000'],
     ['con k', 'sale 20k'],
   ]) {
-    await check(`un monto ${nombre} ("${texto}"): frena dos veces y escala callado, al cliente nada`, async () => {
+    await check(`un monto ${nombre} ("${texto}"): frena dos veces y escala callado, al cliente solo "Enseguida te respondemos."`, async () => {
       const num = nuevo();
       sonnet.guion(sonnet.responde([texto]), sonnet.responde([texto]));
       await bot.procesar(mensaje(num, 'cuanto sale?'));
-      assert.deepStrictEqual(aClientes, [], 'salió un monto');
+      assert.deepStrictEqual(aClientes.map((m) => m.texto), [AVISO_ESCALADO], 'salió un monto');
       assert.strictEqual(alGrupo.length, 1);
       assert.match(alGrupo[0], /🔕 SIN RESPUESTA/);
       assert.match(alGrupo[0], /guardia: .*monto/);
@@ -161,7 +166,8 @@ const nuevo = () => `54900000${String(++n).padStart(5, '0')}`;
     const num = nuevo();
     sonnet.guion(sonnet.responde(['ahora te escribe fran']), sonnet.responde(['ahora te escribe fran']));
     await bot.procesar(mensaje(num, 'hola'));
-    assert.deepStrictEqual(aClientes, []);
+    // La promesa de Sonnet no sale; lo único que recibe es el mensaje fijo del código al escalar.
+    assert.deepStrictEqual(aClientes.map((m) => m.texto), [AVISO_ESCALADO]);
     assert.match(alGrupo[0], /promete que otra persona/);
   });
 
@@ -169,26 +175,31 @@ const nuevo = () => `54900000${String(++n).padStart(5, '0')}`;
     const num = nuevo();
     sonnet.guion(sonnet.responde(['lo escalo al grupo']), sonnet.responde(['te paso unas fotos']));
     await bot.procesar(mensaje(num, 'hola'));
-    assert.deepStrictEqual(aClientes, []);
+    assert.deepStrictEqual(aClientes.map((m) => m.texto), [AVISO_ESCALADO]);
     assert.match(alGrupo[0], /archivo/);
   });
 
   console.log('\nescalar\n');
 
-  await check('escalar: al cliente nada, 🔕 al grupo con el motivo, y lo que sigue queda callado sin llamar a Sonnet', async () => {
+  await check('escalar: al cliente UNA vez "Enseguida te respondemos.", 🔕 al grupo con el motivo, y lo que sigue queda callado sin llamar a Sonnet', async () => {
     const num = nuevo();
     sonnet.guion(sonnet.escala('pregunta si hacen envíos a Plottier'));
     await bot.procesar(mensaje(num, 'hacen envios a plottier?'));
-    assert.deepStrictEqual(aClientes, []);
+    assert.deepStrictEqual(aClientes, [{ numero: jid(num), texto: AVISO_ESCALADO }]);
     assert.strictEqual(alGrupo.length, 1);
     assert.match(alGrupo[0], /🔕 SIN RESPUESTA/);
     assert.match(alGrupo[0], /pregunta si hacen envíos a Plottier/);
     assert.match(alGrupo[0], new RegExp(`wa.me/${num}`));
     assert.strictEqual(state.todos()[jid(num)].escalado, true);
+    // Queda en el registro como una entrega del código ('escalado'), con el id de Evolution y el de su tanda.
+    const entregas = eventos(num, 'entrega');
+    assert.deepStrictEqual(entregas.map((e) => [e.origen, e.formato, e.texto]), [['escalado', 'texto', AVISO_ESCALADO]]);
+    assert.ok(entregas[0].id, 'la entrega no lleva el id de Evolution');
+    assert.strictEqual(entregas[0].tanda, eventos(num, 'propuesta')[0].tanda, 'la entrega no lleva la tanda que escaló');
     p.limpiar();
     await bot.procesar(mensaje(num, 'hola??'));
     assert.strictEqual(sonnet.pedidos.length, 0, 'le preguntó a Sonnet con el chat escalado');
-    assert.deepStrictEqual(aClientes, []);
+    assert.deepStrictEqual(aClientes, [], 'repitió el mensaje con el chat ya escalado');
     assert.deepStrictEqual(alGrupo, []);
   });
 
@@ -244,7 +255,7 @@ const nuevo = () => `54900000${String(++n).padStart(5, '0')}`;
     sonnet.guion(sonnet.responde(['hola! que tal']), sonnet.responde(['hola! que tal']));
     await bot.procesar(mensaje(num, 'hola'));
     await bot.procesar(mensaje(num, 'hola'));
-    assert.deepStrictEqual(aClientes.map((m) => m.texto), ['hola! que tal']);
+    assert.deepStrictEqual(aClientes.map((m) => m.texto), ['hola! que tal', AVISO_ESCALADO]);
     assert.match(alGrupo[0], /ya se lo dije/);
   });
 

@@ -164,9 +164,16 @@ function esViejo(data) {
 }
 
 /**
+ * Lo único que el código le dice al cliente cuando Erasmo le pasa el chat al equipo (decisión de Tomás y Fran,
+ * 16/11/2026): este texto exacto, UNA vez por escalado y a cualquier hora. No lo escribe Sonnet (su guardia no
+ * cambió y este envío no pasa por ella): lo manda `escalarEnSilencio`.
+ */
+const AVISO_ESCALADO = 'Enseguida te respondemos.';
+
+/**
  * El aviso de un escalado al grupo interno (en Piedra no hay planilla de leads: el lead queda acá).
- * `silencio`: al cliente no se le contestó nada. `borrador`: lo que habría contestado (modo borrador o
- * fuera de las listas).
+ * `silencio`: al cliente no se le contestó nada. `borrador`: lo que habría recibido (modo borrador o
+ * fuera de las listas); en un escalado van los dos: el 🔕 y, marcado BORRADOR, el mensaje fijo que no salió.
  */
 function avisoParaGrupo({ chatId, nombre, motivo, borrador, silencio }) {
   const num = chatId.split('@')[0];
@@ -178,15 +185,27 @@ function avisoParaGrupo({ chatId, nombre, motivo, borrador, silencio }) {
 }
 
 /**
- * Escalar sin decirle nada al cliente: el bot nunca promete que otra persona le va a responder; se calla y
- * el grupo es el único que se entera. Como el cliente no recibe nada, el aviso no puede perderse:
+ * Escalar: Erasmo no le contesta al cliente (el bot nunca promete que otra persona le va a responder) y el
+ * grupo interno recibe el aviso. Lo único que le llega al cliente es el mensaje fijo del código, AVISO_ESCALADO
+ * ("Enseguida te respondemos."; Tomás y Fran, 16/11/2026), una sola vez por escalado y a cualquier hora:
+ *  - solo con un escalado que calla (`calla === true`): si Sonnet falló o un audio no se entendió
+ *    (`calla: false`) al cliente no le sale nada, como siempre;
+ *  - solo si el aviso al grupo salió (o quedó en la cola de las 9), y solo cuando el chat pasa de no escalado
+ *    a escalado y callado (`control.escalaEncima`): con el chat ya escalado y callado no se repite;
+ *  - con los candados de siempre: en escucha no sale nada; en borrador o fuera de las listas de prueba
+ *    (`leLlegaAlCliente`) al cliente nada, y el texto va en el mismo aviso marcado BORRADOR; apagado
+ *    (#apagar), excluido, pausado, con una persona de la cuenta que escribió en el medio o con un #sigue
+ *    que lo reactivó antes del envío, tampoco (`frenoDelAvisoDeEscalado`).
+ * Como el cliente no recibe una respuesta, el aviso al grupo no puede perderse:
  *  - un chat que ya estaba escalado y callado no llega hasta acá: lo que escriba lo junta el recordatorio
  *    del escalado (control.js);
- *  - el mismo motivo no se repite dentro de SILENCIO_TRAS_HUMANO_MIN: cinco "ok" seguidos son un aviso;
+ *  - el mismo motivo no se repite dentro de SILENCIO_TRAS_HUMANO_MIN: cinco "ok" seguidos son un aviso (y
+ *    ningún mensaje más al cliente);
  *  - se marca como avisado recién cuando salió: si falló, avisa con el próximo mensaje.
- * En borrador, o fuera de las listas de prueba, el aviso sale pero el chat no queda escalado.
+ * En borrador, o fuera de las listas de prueba, el aviso sale pero el chat no queda escalado. `tanda`: el id
+ * de la tanda que escaló, para la `entrega` del mensaje fijo en el registro.
  */
-async function escalarEnSilencio({ chatId, nombre, motivo, ctx, calla = true }) {
+async function escalarEnSilencio({ chatId, nombre, motivo, ctx, calla = true, tanda = null }) {
   if (config.modoEscucha) {
     console.log(`[escucha] ${chatId}: habria escalado sin contestarle -> ${motivo}`);
     return;
@@ -199,14 +218,84 @@ async function escalarEnSilencio({ chatId, nombre, motivo, ctx, calla = true }) 
     return;
   }
 
-  const r = await evolution.avisarGrupo(avisoParaGrupo({ chatId, nombre, motivo, silencio: true }));
+  // Una sola definición de "le llega al cliente" (evolution.js). Un escalado que calla le gana a uno que no
+  // calla (control.escalaEncima): `pasaAEscalado` dice si este queda anotado. El mensaje fijo va solo ahí, y
+  // solo si calla.
+  const leLlega = evolution.leLlegaAlCliente(chatId);
+  const pasaAEscalado = control.escalaEncima(ctx, calla);
+  const conAviso = calla === true && pasaAEscalado;
+
+  const r = await evolution.avisarGrupo(
+    avisoParaGrupo({ chatId, nombre, motivo, silencio: true, borrador: conAviso && !leLlega ? AVISO_ESCALADO : '' })
+  );
   if (!r || r.bloqueado) return;
   state.actualizar(chatId, { ultimoAvisoSilencio: { motivo, ts: ahora } });
   console.log(`[silencio] ${chatId}: no le conteste, avise al grupo -> ${motivo}`);
 
-  // Una sola definición de "le llega al cliente" (evolution.js). Un escalado que calla le gana a uno que no
-  // calla (control.escalaEncima).
-  if (evolution.leLlegaAlCliente(chatId) && control.escalaEncima(ctx, calla)) control.escalar(chatId, motivo, { calla });
+  if (!leLlega || !pasaAEscalado) return;
+  control.escalar(chatId, motivo, { calla });
+  if (conAviso) await avisarAlClienteDelEscalado(chatId, tanda);
+}
+
+/**
+ * Por qué no sale el mensaje fijo del escalado, o null si sale: apagaron el bot (#apagar), excluyeron el chat,
+ * lo pausaron, escribió una persona de la cuenta o el chat ya no está escalado y callado (un #sigue, o alguien
+ * que lo tomó, entre que escaló y el envío): en todos esos casos ya hay alguien, y decirle "enseguida te
+ * respondemos" con el chat reactivado sería una promesa que nadie tiene a cargo.
+ */
+function frenoDelAvisoDeEscalado(chatId) {
+  if (!interruptor.prendida()) return 'el bot está apagado';
+  if (evolution.esContactoPersonal(chatId)) return MOTIVO_EXCLUIDO;
+  const s = state.obtener(chatId);
+  if (s.pausado) return 'el chat está pausado';
+  if (state.humanoActivo(chatId, config.silencioTrasHumanoMin)) return 'escribió alguien de la cuenta';
+  if (!control.callado(s)) return 'el chat ya no está escalado';
+  return null;
+}
+
+/**
+ * Le manda al cliente el mensaje fijo del escalado (AVISO_ESCALADO), por el camino de cualquier texto:
+ * "escribiendo…", la espera del ritmo, RECIÉN AHÍ el control, y el envío con delay 0 por `enviarAlCliente`
+ * (así su eco no cuenta como una persona de la cuenta y no "toma" el escalado). El control
+ * (`frenoDelAvisoDeEscalado`) va dos veces: antes del "escribiendo…" (si ya hay alguien, el cliente no ve al
+ * bot escribir para nada) y después de la espera, justo antes del envío. Un mensaje nuevo del cliente no lo
+ * frena. Escucha, borrador y las listas ya los miró quien llama (`leLlegaAlCliente`), y `evolution.enviarTexto`
+ * vuelve a mirar las listas, el apagado y los excluidos.
+ *
+ * No se agrega al historial ni a `botEnvio` (como el "🔄 Reiniciado"): no es una respuesta de Erasmo. Lo
+ * último del chat sigue siendo lo que dejó escrito el cliente (para #sigue y para el barrido del silencio) y,
+ * para #vendido / #perdido, un escalado sigue sin contar como que el bot le mandó algo. Queda en el registro
+ * como una `entrega` de origen 'escalado'. Si Evolution falla, el chat ya quedó escalado y el grupo avisado:
+ * se anota (la `entrega` con su error) y nada más. Devuelve si salió.
+ */
+async function avisarAlClienteDelEscalado(chatId, tanda = null) {
+  try {
+    let freno = frenoDelAvisoDeEscalado(chatId);
+    if (!freno) {
+      await evolution.mostrarEscribiendo(chatId, config.ritmo.entreMensajesMs);
+      await dormir(config.ritmo.entreMensajesMs);
+      freno = frenoDelAvisoDeEscalado(chatId);
+    }
+    if (freno) {
+      console.log(`[escalado] ${chatId}: ${freno}, no le mando "${AVISO_ESCALADO}"`);
+      return false;
+    }
+    const enviado = await enviarAlCliente(chatId, 'texto', AVISO_ESCALADO, () => evolution.enviarTexto(chatId, AVISO_ESCALADO, 0), null, {
+      origen: 'escalado',
+      tanda,
+    });
+    if (!autoria.llego(enviado)) {
+      console.log(`[escalado] ${chatId}: "${AVISO_ESCALADO}" no salió${enviado && enviado.motivo ? ` (${enviado.motivo})` : ''}`);
+      return false;
+    }
+    console.log(`[escalado] ${chatId}: le mandé "${AVISO_ESCALADO}"`);
+    return true;
+  } catch (e) {
+    // Un #reset en el medio no es una falla: la tanda se descarta en atenderChat.
+    if (e instanceof state.ChatReiniciado) throw e;
+    console.error(`[escalado] ${chatId}: no pude mandarle "${AVISO_ESCALADO}":`, e.message);
+    return false;
+  }
 }
 
 /**
@@ -214,8 +303,8 @@ async function escalarEnSilencio({ chatId, nombre, motivo, ctx, calla = true }) 
  * conteste, y su id queda anotado para reconocer el eco. Es también el único lugar donde se confirman las
  * marcas de "ya se dijo": se guardan recién con la respuesta de Evolution en la mano. Cada envío deja en el
  * registro de aprendizaje un evento `entrega` con el id que devolvió Evolution, o con `error`. `origen`
- * ('sonnet', 'silencio' o 'sigue') y `tanda` los pasa cada camino; con `origen: null` no se anota (el
- * "🔄 Reiniciado" del #reset del tester).
+ * ('sonnet', 'silencio', 'sigue' o 'escalado': el mensaje fijo al escalar) y `tanda` los pasa cada camino; con
+ * `origen: null` no se anota (el "🔄 Reiniciado" del #reset del tester).
  */
 async function enviarAlCliente(chatId, tipo, texto, enviar, marcas = null, { origen = 'sonnet', tanda = null } = {}) {
   const vuelo = autoria.despegar(chatId, tipo, texto);
@@ -1055,7 +1144,8 @@ async function atenderTanda(chatId, nombre, cola, { cortarPorMensajeNuevo = true
 
     // Un audio que no se pudo transcribir nunca se contesta: podía traer justo lo importante. Al cliente no
     // se le dice nada (no se le promete una llamada): se escala en silencio, sin callar el chat. Un pedido
-    // del catálogo sin texto en la tanda también escala callado, con el nombre del producto si viene.
+    // del catálogo sin texto en la tanda también escala, con el nombre del producto si viene; ese sí calla
+    // el chat, así que al cliente le llega el mensaje fijo del escalado (escalarEnSilencio).
     const titulos = [...new Set(pedidos.map((l) => l.titulo).filter(Boolean))];
     const resultado =
       !conTexto.length && pedidos.length
@@ -1139,10 +1229,11 @@ async function atenderTanda(chatId, nombre, cola, { cortarPorMensajeNuevo = true
       ...(mensajes.length && !ctx.botPropuso ? { botPropuso: Date.now() } : {}),
     });
 
-    // Hace falta una persona y al cliente no se le dice nada: el grupo es el único que se entera. Este aviso
-    // no depende de `escalado`: si el chat ya se había escalado por otra cosa, igual sale.
+    // Hace falta una persona: Erasmo no le contesta y el grupo recibe el aviso. Este aviso no depende de
+    // `escalado`: si el chat ya se había escalado por otra cosa, igual sale. Al cliente, a lo sumo, el mensaje
+    // fijo del código ("Enseguida te respondemos."), una vez por escalado (escalarEnSilencio).
     if (resultado.escalar && !mensajes.length) {
-      await escalarEnSilencio({ chatId, nombre, motivo: resultado.motivo, ctx, calla: resultado.callar !== false });
+      await escalarEnSilencio({ chatId, nombre, motivo: resultado.motivo, ctx, calla: resultado.callar !== false, tanda: idTanda });
       sinRespuesta(resultado.sonnetFallo ? 'sonnet-no-pudo' : String(resultado.motivo || '').includes('ya se lo dije') ? 'repetido' : 'escalo');
       return;
     }
@@ -1884,4 +1975,5 @@ module.exports = {
   arrancarChatsViejos,
   avisarEstadoDanado,
   TECHO_TANDA,
+  AVISO_ESCALADO,
 };

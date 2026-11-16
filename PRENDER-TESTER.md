@@ -62,7 +62,7 @@ Desde el celular del tester (299 429-5806), escribile al WhatsApp de Somos Piedr
 - "Cuánto sale la granza roja para 12 m2?" → los dos totales, sin factura.
 - "Y con factura?" → los totales con el 21 % (también en tarjeta).
 - "Adoquines ojito 10 m2, pago en efectivo" → un solo total.
-- "Hacen envíos a Plottier?" → al cliente no le llega nada; al grupo llega el aviso (de 9 a 20; afuera de ese horario se junta y sale a las 9).
+- "Hacen envíos a Plottier?" → al cliente le llega solo "Enseguida te respondemos." (una vez, a cualquier hora; lo que escriba después ya no se contesta); al grupo llega el aviso (de 9 a 20; afuera de ese horario se junta y sale a las 9).
 - "Lo pienso, en 15 días arranco la obra" → "Dale, no hay problema"; el equipo recibe el aviso ese día a las 9.
 - `#reset` (desde el celular del tester) → arranca el chat de cero.
 
