@@ -1,6 +1,7 @@
 'use strict';
 /**
- * La granza (src/granza.js): por m2, en bolsas, tramos 1-9 / 10-19 / 20+ (supuesto a confirmar con Fran).
+ * La granza (src/granza.js): por m2, en bolsas, tramos 1-9 / 10-14 / 15-19 / 20+ (tabla final de Fran y Tomas, 17/11) y
+ * bolson = 20 bolsas.
  * El orden de la cuenta: precio x bolsas -> + 21 % si hay factura -> para abajo a la centena.
  */
 const assert = require('assert');
@@ -19,7 +20,7 @@ const cuenta = (m2) => g.cotizarGranza({ producto: granza, m2, config: CONFIG })
 console.log('granza');
 
 caso('la tabla de tramos esta en un solo lugar: la del 06/11 con los dos precios que fijo Tomas el 11/11 (20 m2 en efectivo $310.000, 1 m2 con tarjeta $26.500)', () => {
-  assert.deepStrictEqual(g.TRAMOS.map((t) => [t.desde, t.efectivoCentavos / 100, t.listaCentavos === null ? null : t.listaCentavos / 100]), [[1, 22000, 26500], [10, 20000, 25000], [15, 16000, null], [20, 15500, 19000]]);
+  assert.deepStrictEqual(g.TRAMOS.map((t) => [t.desde, t.efectivoCentavos / 100, t.listaCentavos === null ? null : t.listaCentavos / 100]), [[1, 22000, 26500], [10, 20000, 25000], [15, 16000, 19000], [20, 15500, 19000]]);
   assert.strictEqual(g.tramoPara(1).desde, 1);
   assert.strictEqual(g.tramoPara(9).desde, 1);
   assert.strictEqual(g.tramoPara(10).desde, 10);
@@ -74,11 +75,39 @@ caso('el limite de los tramos (Tomas, 16/11: 15 a 19 bolsas a $16.000): 9, 10, 1
   assert.deepStrictEqual([9, 10, 14, 15, 19, 20].map(total), [198000, 200000, 280000, 240000, 304000, 310000]);
 });
 
-caso('15 a 19 bolsas: el precio con tarjeta no esta (FALTA DATO), el de efectivo si', () => {
-  const r = g.cotizarGranza({ producto: granza, cantidad: 16, config: CONFIG });
-  assert.strictEqual(r.efectivo.totalCentavos / 100, 256000);
-  assert.strictEqual(r.lista.ok, false);
-  assert.deepStrictEqual(r.lista.faltaDato, ['listaCentavos']);
+caso('tabla final del 17/11 (Fran y Tomas): tarjeta por bolsa 1-9 26.500, 10-14 25.000, 15-19 19.000, 20+ 19.000; 16 bolsas = 256.000 / 304.000 y 12 bolsas = 240.000 / 300.000', () => {
+  const tot = (n) => g.cotizarGranza({ producto: granza, cantidad: n, config: CONFIG });
+  assert.deepStrictEqual([1, 9, 10, 14, 15, 19, 20, 30].map((n) => tot(n).lista.totalCentavos / 100 / n), [26500, 26500, 25000, 25000, 19000, 19000, 19000, 19000]);
+  const diecisies = tot(16);
+  assert.deepStrictEqual([pesos(diecisies.efectivo.totalCentavos), pesos(diecisies.lista.totalCentavos)], ['$256.000', '$304.000']);
+  const doce = tot(12);
+  assert.deepStrictEqual([pesos(doce.efectivo.totalCentavos), pesos(doce.lista.totalCentavos)], ['$240.000', '$300.000']);
+  // 14 bolsas con tarjeta salen MAS caras que 15 (350.000 contra 285.000): se cobra el precio de la banda, no se corrige.
+  assert.deepStrictEqual([14, 15].map((n) => tot(n).lista.totalCentavos / 100), [350000, 285000]);
+});
+
+caso('bolson (17/11): 1 bolson = 1 m3 = 20 bolsas de 40 kg; se cobra el tramo 20+: 1 bolson 310.000 / 380.000, 3 bolsones 930.000 / 1.140.000', () => {
+  assert.strictEqual(g.BOLSAS_POR_BOLSON, 20);
+  const uno = g.cotizarGranza({ producto: granza, bolsones: 1, config: CONFIG });
+  assert.strictEqual(uno.ok, true, JSON.stringify(uno));
+  assert.strictEqual(uno.bolsas, 20);
+  assert.strictEqual(uno.bolsones, 1);
+  assert.deepStrictEqual([pesos(uno.efectivo.totalCentavos), pesos(uno.lista.totalCentavos)], ['$310.000', '$380.000']);
+  const tres = g.cotizarGranza({ producto: granza, bolsones: 3, config: CONFIG });
+  assert.strictEqual(tres.bolsas, 60);
+  assert.deepStrictEqual([pesos(tres.efectivo.totalCentavos), pesos(tres.lista.totalCentavos)], ['$930.000', '$1.140.000']);
+  // con factura: 310.000 x 1,21 = 375.100
+  assert.strictEqual(pesos(uno.efectivo.conFactura.totalCentavos), '$375.100');
+});
+
+caso('bolson: solo enteros y positivos; no se mezcla con m2 ni con cantidad', () => {
+  for (const malo of [0, -1, 1.5, '1,5', 'medio', 'x']) {
+    const r = g.cotizarGranza({ producto: granza, bolsones: malo, config: CONFIG });
+    assert.strictEqual(r.ok, false, String(malo));
+    assert.strictEqual(r.error, 'bolsones_invalidos', String(malo));
+  }
+  assert.strictEqual(g.cotizarGranza({ producto: granza, bolsones: 1, m2: 5, config: CONFIG }).error, 'cantidad_doble');
+  assert.strictEqual(g.cotizarGranza({ producto: granza, bolsones: 1, cantidad: 5, config: CONFIG }).error, 'cantidad_doble');
 });
 
 caso('los dos precios que fijo Tomas el 11/11: 20 m2 en efectivo $310.000 y 1 m2 con tarjeta $26.500', () => {
@@ -105,7 +134,7 @@ caso('errores de dominio pasan tal cual y no cobran nada', () => {
   assert.strictEqual(g.cotizarGranza({ producto: granza, m2: 5, config: CONFIG, medio: 'bitcoin' }).error, 'medio_desconocido');
 });
 
-caso('el catalogo trae los 3 colores como granza (Fran, 16/11: gris Tandil, roja y blanca Mar del Plata), y nunca "bolson"', () => {
+caso('el catalogo trae los 3 colores como granza (Fran, 16/11: gris Tandil, roja y blanca Mar del Plata); el bolson no es un producto aparte', () => {
   const p = g.productosDelCatalogo();
   assert.deepStrictEqual(p.map((x) => x.nombre).sort(), ['Granza blanca Mar del Plata', 'Granza gris Tandil', 'Granza roja']);
   assert.ok(p.every((x) => g.esGranza(x) && x.unidad === 'bolsa'));
