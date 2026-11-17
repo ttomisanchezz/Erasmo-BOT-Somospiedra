@@ -754,6 +754,21 @@ function guardarColaAvisos(lista) {
 }
 
 /**
+ * Los colores de granza sin stock (#sinstock / #hay, src/stock-colores.js): array de claves ('gris', 'roja',
+ * 'blanca') bajo la clave interna. Arranca vacío (todo en stock), sobrevive a un reinicio y #reset no lo toca.
+ * Guarda YA: es una decisión del negocio.
+ */
+function sinStockColores() {
+  const c = interno().sinStock;
+  return Array.isArray(c) ? c : [];
+}
+
+function guardarSinStockColores(lista) {
+  interno().sinStock = [...lista];
+  guardarYa();
+}
+
+/**
  * El gasto de Sonnet del mes (bloque Ninjo 2, 06/10/2026): `{ mes: 'AAAA-MM', usd }`, el mes de
  * Argentina. Lo suma cerebro.js con cada llamada a la API (`sumarAlMes`), en el mismo lugar que el
  * gasto del día; /salud lo muestra. Bajo la clave interna: sobrevive a un reinicio y #reset no lo toca.
@@ -872,6 +887,8 @@ module.exports = {
   numerosExcluidos,
   colaAvisos,
   guardarColaAvisos,
+  sinStockColores,
+  guardarSinStockColores,
   generados,
   guardarGenerado,
   borrarGenerados,

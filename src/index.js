@@ -31,6 +31,7 @@ const recordatorios = require('./recordatorios');
 const ventas = require('./ventas');
 // Lista de excluidos a mano (#excluir / #incluir / #excluidos): src/excluidos.js.
 const excluidos = require('./excluidos');
+const stockColores = require('./stock-colores');
 const acciones = require('./acciones');
 const autoria = require('./autoria');
 const control = require('./control');
@@ -432,6 +433,9 @@ async function comandoDelGrupo(data) {
   // #excluir / #incluir con el número, y #excluidos: la lista de contactos que el bot ignora.
   const exc = excluidos.comando(texto);
   if (exc) await confirmarExcluidos(excluidos.desdeGrupo(exc));
+  // #sinstock / #hay: qué colores de granza no hay en stock.
+  const stk = stockColores.comando(texto);
+  if (stk) await confirmarStockColores(stockColores.desdeGrupo(stk));
   // #pausa y #sigue con el número. #sigue contesta lo que dejó escrito el cliente (`alSeguir`): sus líneas
   // quedan en la cola al reactivar y la tanda arranca ya (lo primero que hace es la espera de siempre, así
   // el aviso sale antes).
@@ -1721,6 +1725,13 @@ async function atenderComando(chatId, cmd, origen) {
 /** `#vendido` / `#perdido` en el chat de un cliente: guarda y confirma al grupo. */
 async function atenderVenta(chatId, cmd, origen) {
   await confirmarVenta(ventas.marcar(chatId, cmd.tipo, origen));
+}
+
+/** Confirma al grupo un #sinstock / #hay (o la lista). Nunca manda nada al cliente. */
+async function confirmarStockColores({ cambio, texto }) {
+  if (cambio) console.log('[stock-colores] ' + texto.split('\n')[0]);
+  const r = await evolution.avisarGrupo(texto, { inmediato: true });
+  if (r && r.bloqueado) console.log('[stock-colores] ' + (cambio ? 'queda guardado, pero ' : '') + 'la confirmacion no salio: ' + r.motivo);
 }
 
 /**
