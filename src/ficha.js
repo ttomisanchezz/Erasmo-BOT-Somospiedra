@@ -11,6 +11,15 @@
  */
 const MAX_COTIZACIONES = 5;
 
+/**
+ * Desde cuánto una compra es "grande" para las cuotas (Fran y Tomás, 17/11/2026): hasta ese total, "por ahora no tenemos
+ * cuotas"; por encima, "en compras grandes se puede ver pagar en partes" y lo ve una persona. En centavos: $1.000.000.
+ */
+const UMBRAL_PAGAR_EN_PARTES_CENTAVOS = 100000000;
+
+/** ¿Un total (en centavos) pasa el umbral? "Pasa" es MAYOR: exactamente $1.000.000 todavía no. */
+const pasaElUmbralDePagarEnPartes = (centavos) => Number(centavos) > UMBRAL_PAGAR_EN_PARTES_CENTAVOS;
+
 const recorte = (t, largo) => {
   const una = String(t || '').replace(/\s+/g, ' ').trim();
   return una.length > largo ? una.slice(0, largo - 1).trimEnd() + '…' : una;
@@ -53,4 +62,4 @@ function comoTexto(ficha) {
   return partes.join(' · ') || 'sin ficha';
 }
 
-module.exports = { armar, comoTexto, recorte };
+module.exports = { armar, comoTexto, recorte, UMBRAL_PAGAR_EN_PARTES_CENTAVOS, pasaElUmbralDePagarEnPartes };

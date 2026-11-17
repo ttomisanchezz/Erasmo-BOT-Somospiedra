@@ -51,11 +51,12 @@ const totalesDe = (r) => r.totales.map((t) => t.total);
     assert.strictEqual(r.productos[0].tiene_precio, false);
     assert.match(r.aviso, /escal/);
   });
-  await check('la granza está siempre (tabla propia), por m² en bolsas, nunca por bolsón', async () => {
+  await check('la granza está siempre (tabla propia), por m² en bolsas de 40 kg y también por bolsón (1 bolsón = 20 bolsas, 17/11)', async () => {
     const r = await por('buscar_productos').correr({ consulta: 'granza' });
     assert.strictEqual(r.productos.length, 3);
-    assert.ok(r.productos.every((x) => /bolsas de unos 40 kg/.test(x.se_vende_por) && x.tiene_precio));
-    assert.ok(!/bols[oó]n/i.test(JSON.stringify(r)));
+    assert.ok(r.productos.every((x) => /bolsas de unos 40 kg/.test(x.se_vende_por) && /1 bolsón = 20 bolsas/.test(x.se_vende_por) && x.tiene_precio));
+    assert.ok(r.productos.every((x) => x.hay_stock === undefined), 'sin #sinstock, no se marca nada');
+    assert.ok(!/\$|\d{5,}/.test(JSON.stringify(r)), 'trae un monto');
   });
   await check('lo que no existe: lista vacía y el aviso de escalar', async () => {
     const r = await por('buscar_productos').correr({ consulta: 'pegamento' });
@@ -81,33 +82,55 @@ const totalesDe = (r) => r.totales.map((t) => t.total);
   });
 
   console.log('\ncotizar');
-  await check('Adoquines ojito 10 m2, sin forma de pago: los dos totales, sin factura (centavos del panel -> pesos)', async () => {
+  await check('Adoquines ojito 10 m2, sin forma de pago: SOLO el total en efectivo o transferencia (17/11: la tarjeta, si la pide), sin ofrecer factura', async () => {
     const t = turno();
     const r = await por('cotizar').correr({ producto: 'Adoquines ojito', m2: '10' }, t);
     assert.strictEqual(r.ok, true, JSON.stringify(r));
-    assert.deepStrictEqual(totalesDe(r), ['$780.000', '$900.000']);
-    assert.match(r.factura, /SIN factura/);
-    assert.deepStrictEqual(t.montos.slice(0, 2), [780000, 900000]);
+    assert.deepStrictEqual(totalesDe(r), ['$780.000']);
+    assert.strictEqual(r.totales[0].forma_de_pago, 'efectivo o transferencia');
+    assert.match(r.factura, /no la menciones/);
+    assert.ok(!/sin factura/i.test(r.factura));
+    assert.match(r.aviso, /no menciones la tarjeta/);
+    assert.deepStrictEqual(t.montos.slice(0, 1), [780000]);
+    assert.ok(!t.montos.includes(900000), 'el de tarjeta no se deja escribir si no se pidió');
+    assert.strictEqual(r.precio_de_una_unidad.por_forma_de_pago.length, 1);
     assert.strictEqual(r.precio_de_una_unidad.por_forma_de_pago[0].precio, '$78.000');
   });
-  await check('con factura: +21 % también sobre la tarjeta, redondeado para abajo a la centena', async () => {
+  await check('ningún texto de la salida de cotizar nombra Mercado Pago, QR ni el IVA que se ofrece (17/11)', async () => {
+    for (const args of [{ m2: '10' }, { m2: '10', forma_pago: 'tarjeta' }, { m2: '10', forma_pago: 'transferencia' }]) {
+      const r = await por('cotizar').correr({ producto: 'Adoquines ojito', ...args }, turno());
+      assert.ok(!/mercado|\bqr\b|\+ ?IVA|si necesit/i.test(JSON.stringify(r)), JSON.stringify(r));
+    }
+    assert.ok(!/mercado|\bqr\b/i.test(JSON.stringify(por('cotizar').definicion)), 'la definición de la herramienta');
+  });
+  await check('Mercado Pago y QR ya no son formas de pago: error que manda a escalar', async () => {
+    for (const forma of ['mercado_pago', 'qr']) {
+      const e = await por('cotizar').correr({ producto: 'Adoquines ojito', m2: '10', forma_pago: forma }, turno());
+      assert.ok(e.error && /escal/.test(e.error), forma);
+    }
+  });
+  await check('con factura (solo si la pide el cliente): +21 %, redondeado para abajo a la centena, en efectivo y en tarjeta', async () => {
     const t = turno();
     const r = await por('cotizar').correr({ producto: 'Adoquines ojito', m2: '10', con_factura: true }, t);
-    assert.deepStrictEqual(totalesDe(r), ['$943.800', '$1.089.000']);
+    assert.deepStrictEqual(totalesDe(r), ['$943.800']);
     assert.match(r.factura, /CON factura/);
-    assert.ok(t.montos.includes(943800) && t.montos.includes(1089000));
+    assert.ok(t.montos.includes(943800));
+    const tarjeta = await por('cotizar').correr({ producto: 'Adoquines ojito', m2: '10', con_factura: true, forma_pago: 'tarjeta' }, turno());
+    assert.deepStrictEqual(totalesDe(tarjeta), ['$1.089.000']);
     // Las herramientas no son strict: un "true" escrito como texto también es factura (no se pierde el IVA).
     const comoTexto = await por('cotizar').correr({ producto: 'Adoquines ojito', m2: '10', con_factura: 'true' }, turno());
-    assert.deepStrictEqual(totalesDe(comoTexto), ['$943.800', '$1.089.000']);
+    assert.deepStrictEqual(totalesDe(comoTexto), ['$943.800']);
     const sin = await por('cotizar').correr({ producto: 'Adoquines ojito', m2: '10', con_factura: 'false' }, turno());
-    assert.deepStrictEqual(totalesDe(sin), ['$780.000', '$900.000']);
+    assert.deepStrictEqual(totalesDe(sin), ['$780.000']);
   });
   await check('con forma de pago: solo esa columna (tarjeta = un solo pago)', async () => {
     const r = await por('cotizar').correr({ producto: 'Adoquines ojito', m2: '10', forma_pago: 'tarjeta' }, turno());
     assert.deepStrictEqual(totalesDe(r), ['$900.000']);
     assert.match(r.totales[0].forma_de_pago, /un solo pago/);
-    const e = await por('cotizar').correr({ producto: 'Adoquines ojito', m2: '10', forma_pago: 'mercado_pago' }, turno());
-    assert.deepStrictEqual(totalesDe(e), ['$780.000']);
+    assert.ok(!/no menciones la tarjeta/.test(r.aviso));
+    const t = await por('cotizar').correr({ producto: 'Adoquines ojito', m2: '10', forma_pago: 'transferencia' }, turno());
+    assert.deepStrictEqual(totalesDe(t), ['$780.000']);
+    assert.strictEqual(t.totales[0].forma_de_pago, 'efectivo o transferencia');
   });
   await check('largo y ancho: los multiplica el código (3,5 x 3,5 = 12,25 m2)', async () => {
     assert.strictEqual(herr.m2DeLargoYAncho('3,5', '3,5'), '12.2500');
@@ -124,12 +147,12 @@ const totalesDe = (r) => r.totales.map((t) => t.total);
     const r = await por('cotizar').correr({ producto: 'ADOQUINES  Ojito', m2: '1' }, turno());
     assert.strictEqual(r.ok, true);
   });
-  await check('FALTA DATO: sin precio en la tarjeta no sale ningún monto (y no anota montos)', async () => {
+  await check('FALTA DATO: sin precio en la tarjeta, pedirla no da ningún monto (y no anota montos); el efectivo sí sale', async () => {
     const t = turno();
-    const r = await por('cotizar').correr({ producto: 'Laja San Luis', m2: '4' }, t);
+    const r = await por('cotizar').correr({ producto: 'Laja San Luis', m2: '4', forma_pago: 'tarjeta' }, t);
     assert.match(r.error, /FALTA DATO/);
     assert.deepStrictEqual(t.montos, []);
-    const sola = await por('cotizar').correr({ producto: 'Laja San Luis', m2: '4', forma_pago: 'efectivo' }, turno());
+    const sola = await por('cotizar').correr({ producto: 'Laja San Luis', m2: '4' }, turno());
     assert.deepStrictEqual(totalesDe(sola), ['$200.000']);
     const sinNada = await por('cotizar').correr({ producto: 'Piedra bola', m2: '4' }, turno());
     assert.match(sinNada.error, /FALTA DATO/);
@@ -140,8 +163,8 @@ const totalesDe = (r) => r.totales.map((t) => t.total);
     assert.match((await por('cotizar').correr({ producto: 'Laja en caja', cantidad: 300 }, turno())).error, /100 m²/);
     assert.strictEqual((await por('cotizar').correr({ producto: 'Adoquines ojito', m2: '100' }, turno())).ok, true);
   });
-  await check('cuotas, cheque, pago mixto y dólares no se cotizan: escala', async () => {
-    for (const forma of ['cheque', 'cuotas', 'dolares', 'mixto']) {
+  await check('cuotas, cheque y dólares no se cotizan: escala', async () => {
+    for (const forma of ['cheque', 'cuotas', 'dolares']) {
       const r = await por('cotizar').correr({ producto: 'Adoquines ojito', m2: '4', forma_pago: forma }, turno());
       assert.match(r.error, /persona/, forma);
     }
@@ -158,27 +181,79 @@ const totalesDe = (r) => r.totales.map((t) => t.total);
     assert.deepStrictEqual([totalesDe(sin)[0], totalesDe(con)[0]], ['$780.000', '$858.000']);
     assert.ok((await por('cotizar').correr({ producto: 'Adoquines ojito', m2: '10', desperdicio_pct: 50 }, turno())).error);
   });
-  await check('granza por m2: 5, 12 y 25 m2, con y sin factura (los precios del 06/11 con los dos que fijó Tomás el 11/11)', async () => {
-    const g = async (m2, con_factura) => totalesDe(await por('cotizar').correr({ producto: 'Granza roja', m2: String(m2), con_factura }, turno()));
-    assert.deepStrictEqual(await g(5), ['$110.000', '$132.500']);
-    assert.deepStrictEqual(await g(12), ['$240.000', '$300.000']);
-    assert.deepStrictEqual(await g(25), ['$387.500', '$475.000']);
-    assert.deepStrictEqual(await g(5, true), ['$133.100', '$160.300']);
-    assert.deepStrictEqual(await g(12, true), ['$290.400', '$363.000']);
-    assert.deepStrictEqual(await g(25, true), ['$468.800', '$574.700']);
+  await check('granza por m2: 5, 12 y 25 m2, en efectivo y con tarjeta, con y sin factura (tabla final del 17/11)', async () => {
+    const g = async (m2, forma_pago, con_factura) => totalesDe(await por('cotizar').correr({ producto: 'Granza roja', m2: String(m2), forma_pago, con_factura }, turno()));
+    assert.deepStrictEqual([await g(5), await g(12), await g(25)], [['$110.000'], ['$240.000'], ['$387.500']]);
+    assert.deepStrictEqual([await g(5, 'tarjeta'), await g(12, 'tarjeta'), await g(25, 'tarjeta')], [['$132.500'], ['$300.000'], ['$475.000']]);
+    assert.deepStrictEqual([await g(5, undefined, true), await g(12, undefined, true), await g(25, undefined, true)], [['$133.100'], ['$290.400'], ['$468.800']]);
+    assert.deepStrictEqual([await g(5, 'tarjeta', true), await g(12, 'tarjeta', true), await g(25, 'tarjeta', true)], [['$160.300'], ['$363.000'], ['$574.700']]);
     const r = await por('cotizar').correr({ producto: 'Granza roja', m2: '12,25' }, turno());
     assert.match(r.cantidad, /^13 bolsas/);
     assert.strictEqual(r.precio_de_una_unidad.por_forma_de_pago[0].precio, '$20.000'); // el tramo de 10 a 14 bolsas
   });
-  await check('granza de 15 a 19 bolsas: sin forma de pago sale solo el efectivo y avisa que la tarjeta no está; con tarjeta, FALTA DATO', async () => {
+  await check('granza de 15 a 19 bolsas (17/11): 16 bolsas = $256.000 en efectivo y $304.000 con tarjeta ($19.000 la bolsa)', async () => {
     const t = turno();
     const r = await por('cotizar').correr({ producto: 'Granza roja', m2: '16' }, t);
     assert.strictEqual(r.ok, true, JSON.stringify(r));
     assert.deepStrictEqual(totalesDe(r), ['$256.000']);
-    assert.match(r.aviso_tarjeta, /no lo digas/);
-    assert.ok(!t.montos.some((m) => m !== 256000 && m !== 16000), JSON.stringify(t.montos));
+    assert.ok(!r.aviso_tarjeta);
     const tarjeta = await por('cotizar').correr({ producto: 'Granza roja', m2: '16', forma_pago: 'tarjeta' }, turno());
-    assert.ok(tarjeta.error && /FALTA DATO/.test(tarjeta.error), JSON.stringify(tarjeta));
+    assert.deepStrictEqual(totalesDe(tarjeta), ['$304.000']);
+  });
+  await check('bolsón de granza (17/11): 1 bolsón = 20 bolsas = $310.000 en efectivo y $380.000 con tarjeta; la cuenta la hace el código', async () => {
+    const t = turno();
+    const r = await por('cotizar').correr({ producto: 'Granza roja', bolsones: 1 }, t);
+    assert.strictEqual(r.ok, true, JSON.stringify(r));
+    assert.strictEqual(r.cantidad, '1 bolsón (20 bolsas de 40 kg)');
+    assert.deepStrictEqual(totalesDe(r), ['$310.000']);
+    assert.ok(t.montos.includes(310000));
+    assert.deepStrictEqual([t.cotizo.cantidad, t.cotizo.unidad], ['1', 'bolsón']);
+    const tarjeta = await por('cotizar').correr({ producto: 'Granza gris Tandil', bolsones: 1, forma_pago: 'tarjeta' }, turno());
+    assert.deepStrictEqual(totalesDe(tarjeta), ['$380.000']);
+    const dos = await por('cotizar').correr({ producto: 'Granza roja', bolsones: '2' }, turno());
+    assert.strictEqual(dos.cantidad, '2 bolsones (40 bolsas de 40 kg)');
+    assert.deepStrictEqual(totalesDe(dos), ['$620.000']);
+    // 5 bolsones = 100 bolsas = 100 m2: todavía; 6 pasan el tope de obra grande y lo ve una persona.
+    assert.strictEqual((await por('cotizar').correr({ producto: 'Granza roja', bolsones: 5 }, turno())).ok, true);
+    assert.match((await por('cotizar').correr({ producto: 'Granza roja', bolsones: 6 }, turno())).error, /100 m²/);
+  });
+  await check('bolsón: no se mezcla con otra cantidad, no vale para otros productos y tiene que ser entero', async () => {
+    assert.match((await por('cotizar').correr({ producto: 'Granza roja', bolsones: 1, m2: '5' }, turno())).error, /una sola cantidad/);
+    assert.match((await por('cotizar').correr({ producto: 'Granza roja', bolsones: 1, cantidad: 3 }, turno())).error, /una sola cantidad/);
+    assert.match((await por('cotizar').correr({ producto: 'Adoquines ojito', bolsones: 1 }, turno())).error, /solo de la granza/);
+    for (const malo of [0, 1.5, 'medio']) assert.match((await por('cotizar').correr({ producto: 'Granza roja', bolsones: malo }, turno())).error, /entero/, String(malo));
+  });
+  await check('cuotas (17/11): una compra de más de $1.000.000 lo avisa (compra_grande) y la ficha guarda el total; hasta $1.000.000 no', async () => {
+    const grande = turno();
+    const r = await por('cotizar').correr({ producto: 'Adoquines ojito', m2: '14' }, grande); // 14 x 78.000 = 1.092.000
+    assert.deepStrictEqual(totalesDe(r), ['$1.092.000']);
+    assert.match(r.compra_grande, /pide pagar en partes/);
+    assert.strictEqual(grande.cotizo.totalCentavos, 109200000);
+    const chica = await por('cotizar').correr({ producto: 'Granza roja', bolsones: 3 }, turno()); // 930.000
+    assert.ok(!chica.compra_grande);
+    const mil = await por('cotizar').correr({ producto: 'Lomo de burro', cantidad: 1000 }, turno()); // 1.000 x 1.000 = 1.000.000 exactos
+    assert.deepStrictEqual(totalesDe(mil), ['$1.000.000']);
+    assert.ok(!mil.compra_grande, 'exactamente $1.000.000 no pasa');
+  });
+  await check('un color de granza sin stock (#sinstock, 17/11): no se cotiza, buscar_productos lo marca (no lo saca) y los otros siguen; con #hay vuelve', async () => {
+    const stock = require('../src/stock-colores');
+    try {
+      stock.desdeGrupo({ tipo: 'sinstock', resto: 'roja' });
+      const t = turno();
+      const e = await por('cotizar').correr({ producto: 'Granza roja', m2: '10' }, t);
+      assert.match(e.error, /no hay de ese color/);
+      assert.deepStrictEqual(t.montos, []);
+      assert.strictEqual((await por('cotizar').correr({ producto: 'Granza roja', bolsones: 1 }, turno())).ok === true, false);
+      assert.strictEqual((await por('cotizar').correr({ producto: 'Granza gris Tandil', m2: '10' }, turno())).ok, true);
+      const b = await por('buscar_productos').correr({ consulta: 'granza' });
+      assert.strictEqual(b.productos.length, 3);
+      assert.deepStrictEqual(b.productos.map((x) => [x.nombre, x.hay_stock]).filter(([, h]) => h === false), [['Granza roja', false]]);
+      assert.match(b.aviso, /NO hay/);
+      stock.desdeGrupo({ tipo: 'hay', resto: 'roja' });
+      assert.strictEqual((await por('cotizar').correr({ producto: 'Granza roja', m2: '10' }, turno())).ok, true);
+    } finally {
+      stock.desdeGrupo({ tipo: 'hay', resto: 'gris, roja, blanca' });
+    }
   });
   await check('una caja: los m2 se convierten en cajas enteras (3 m2 = 6 cajas de 0,5 m2) y dice cuánto cubre', async () => {
     const r = await por('cotizar').correr({ producto: 'Laja en caja', m2: '3', forma_pago: 'efectivo' }, turno());
@@ -197,7 +272,7 @@ const totalesDe = (r) => r.totales.map((t) => t.total);
   await check('lo que devuelve cotizar pasa por la guardia; un monto inventado, no', async () => {
     const t = turno();
     const r = await por('cotizar').correr({ producto: 'Adoquines ojito', m2: '10', con_factura: true }, t);
-    const buenos = [`Para 10 m² te sale ${r.totales[0].total} en efectivo con factura.`, `Con tarjeta ${r.totales[1].total}.`];
+    const buenos = [`Para 10 m² te sale ${r.totales[0].total} en efectivo con factura.`];
     assert.strictEqual(cerebro.revisarSalida(buenos, t.montos).guardia, null);
     assert.match(cerebro.revisarSalida(['Te sale $944.000 en efectivo.'], t.montos).guardia, /monto que no salió de ninguna herramienta/);
     assert.match(cerebro.revisarSalida(['Te sale $780.000 en efectivo.'], t.montos).guardia, /monto/); // el sin factura no se pidió

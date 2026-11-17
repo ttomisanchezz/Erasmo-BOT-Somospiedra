@@ -52,6 +52,8 @@ const contexto = require('./contexto');
 const salida = require('./salida');
 const herramientasErasmo = require('./herramientas-erasmo');
 const ficha = require('./ficha');
+const { formatearPesos } = require('./cotizador-piedra');
+const stockColores = require('./stock-colores');
 
 /** Las instrucciones: se leen una vez, al arrancar. Van con cache_control (se reaprovechan). */
 const REGLAS = fs.readFileSync(path.join(__dirname, 'cerebro-reglas.md'), 'utf8');
@@ -498,6 +500,23 @@ function loQueSabe(s, nombre) {
   if (notas.length) out.push(`contó: ${notas.join('; ')}`);
   if (s.resultado && s.resultado.tipo) out.push(`el chat está marcado como ${s.resultado.tipo === 'vendido' ? 'venta cerrada' : s.resultado.tipo}`);
   if (s.escalado) out.push('el chat está escalado a una persona');
+  // Colores de granza sin stock hoy (#sinstock en el grupo, 17/11/2026): vale para todos los chats.
+  const faltan = stockColores.sinStock();
+  if (faltan.length) {
+    out.push(
+      `hoy NO hay stock de: ${faltan.join(', ')}. No lo ofrezcas ni lo menciones (ofrecé solo los otros colores). Si el cliente lo pide, decile que hoy no hay de ese color y ofrecele los otros; no lo cotices`
+    );
+  }
+  // Lo último cotizado y si pasa el millón, para las cuotas (Fran y Tomás, 17/11/2026): la cuenta la hace el código.
+  const pidio = s.ficha && s.ficha.pidio;
+  if (pidio && Number.isFinite(Number(pidio.totalCentavos)) && Number(pidio.totalCentavos) > 0) {
+    const total = formatearPesos(pidio.totalCentavos);
+    out.push(
+      ficha.pasaElUmbralDePagarEnPartes(pidio.totalCentavos)
+        ? `lo último que cotizaste (${pidio.producto}, ${pidio.cantidad} ${pidio.unidad}) fue de ${total}: es una compra grande, y si pregunta por cuotas, financiación o pagar en partes escalás con el motivo "pide pagar en partes, compra de ${total}" (el monto es para el grupo, no se lo digas al cliente)`
+        : `lo último que cotizaste (${pidio.producto}, ${pidio.cantidad} ${pidio.unidad}) fue de ${total}: no es una compra grande, y si pregunta por cuotas le decís que por ahora no hay y seguís (el monto no se lo repetís)`
+    );
+  }
   // De qué anuncio vino (revisión de la sombra, 16/11/2026): Fran lo sabe al contestar; Erasmo no lo sabía.
   const ad = s.anuncioUltimo || s.anuncio;
   if (ad) out.push(ad.titulo ? `vino de un anuncio de Meta: "${String(ad.titulo).replace(/\s+/g, ' ').trim()}"` : 'vino de un anuncio de Meta (sin título)');

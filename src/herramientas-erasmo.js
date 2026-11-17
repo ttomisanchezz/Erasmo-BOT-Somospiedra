@@ -16,11 +16,16 @@
  *    turno termina en `escalar` se descartan. Así la sombra, `#sonnet` y `#comparar` no mandan ni agendan nada.
  *  - Lo que no se puede cotizar (producto que no está, FALTA DATO, más de 100 m², cheque, cuotas, dólares)
  *    vuelve como `error` y Sonnet escala.
+ *  - Corrida del 17/11/2026 (Fran y Tomás): sin forma de pago sale SOLO el total en efectivo o transferencia (la tarjeta,
+ *    si la pide el cliente: `forma_pago` tarjeta); no se ofrece factura (con `con_factura` se suma el 21 %); los medios son
+ *    efectivo, transferencia y tarjeta; la granza también se pide en bolsones (cada uno son 20 bolsas); un color de granza
+ *    sin stock (`#sinstock`) no se cotiza.
  */
 const state = require('./state');
 const documentos = require('./documentos');
 const cotizador = require('./cotizador-piedra');
 const granza = require('./granza');
+const ficha = require('./ficha');
 const { buscarProductos, pideLajaEnGeneral } = require('./catalogo-piedra');
 
 /** Obra grande: arriba de esto lo ve una persona (reglas aprobadas, "Lo que siempre escalás"). */
@@ -68,6 +73,9 @@ const sinTildes = (s) => String(s == null ? '' : s).normalize('NFD').replace(/[�
 /** El nombre para comparar: sin tildes, en minúsculas y con los espacios normalizados. */
 const norm = (s) => sinTildes(s).toLowerCase().replace(/\s+/g, ' ').trim();
 
+/** Un color de granza que el local marcó sin stock (`#sinstock`, src/stock-colores.js). Se mira al momento de usarlo. */
+const sinStock = (nombre) => require('./stock-colores').haySinStock(nombre);
+
 const UNIDAD_TEXTO = { m2: 'm²', metro: 'metro', m3: 'm³', kg: 'kg', unidad: 'unidad', bolsa: 'bolsa', bolson: 'bolsón', caja: 'caja', malla: 'malla', litro: 'litro' };
 const unidadTexto = (u) => UNIDAD_TEXTO[u] || String(u || '');
 const PLURAL = { m2: 'm²', metro: 'metros', m3: 'm³', kg: 'kg', unidad: 'unidades', bolsa: 'bolsas', bolson: 'bolsones', caja: 'cajas', malla: 'mallas', litro: 'litros' };
@@ -85,6 +93,11 @@ const AVISO_LAJA =
   '"Laja" es cualquier piedra: la gente le dice así a todas, y estas son las que se trabajan (la granza, la laca y las baldosas no ' +
   'son lajas). Todavía no hay un producto para cotizar: mandale el catálogo y preguntale cuál le gusta o qué color busca. Si nombró ' +
   'una que no está en esta lista, no la inventes: escalá.';
+
+/** Lo que acompaña a un color de granza sin stock (`hay_stock` false). */
+const AVISO_SIN_STOCK =
+  'Los que dicen hay_stock false hoy NO hay: no los ofrezcas ni los menciones (ofrecé solo los que hay). Si el cliente pide ' +
+  'uno de esos, decile que hoy no hay de ese color, ofrecele los otros y no lo cotices.';
 
 const BUSCAR_PRODUCTOS = {
   definicion: {
@@ -112,7 +125,8 @@ const BUSCAR_PRODUCTOS = {
       const esGranza = granza.esGranza(p);
       return {
         nombre: f.nombre,
-        se_vende_por: esGranza ? 'm², en bolsas de unos 40 kg (1 bolsa rinde cerca de 1 m² a 3 cm)' : unidadTexto(f.unidad),
+        se_vende_por: esGranza ? 'm², en bolsas de unos 40 kg (1 bolsa rinde cerca de 1 m² a 3 cm); también en bolsones (1 bolsón = 20 bolsas)' : unidadTexto(f.unidad),
+        ...(esGranza && sinStock(f.nombre) ? { hay_stock: false } : {}),
         ...(!esGranza && p.coberturaM2 ? { cada_unidad_cubre_m2: decimalComoTexto(p.coberturaM2) } : {}),
         tiene_precio: esGranza ? true : Boolean(f.tienePrecio),
       };
@@ -120,6 +134,7 @@ const BUSCAR_PRODUCTOS = {
     const r = { productos, hay_mas: filas.length > tope };
     if (!productos.length) r.aviso = 'No hay productos con ese nombre. No lo trabajamos o no está cargado: no inventes nada, si lo pide el cliente escalá.';
     else if (enGeneral) r.aviso = AVISO_LAJA;
+    else if (productos.some((p) => p.hay_stock === false)) r.aviso = AVISO_SIN_STOCK;
     else if (productos.some((p) => !p.tiene_precio)) r.aviso = 'Los que dicen tiene_precio false no se pueden cotizar: si el cliente quiere uno de esos, escalá.';
     return r;
   },
@@ -152,14 +167,12 @@ function m2DeLargoYAncho(largo, ancho) {
 const FORMAS_DE_PAGO = {
   efectivo: { medio: 'efectivo', columna: 'efectivo' },
   transferencia: { medio: 'transferencia', columna: 'efectivo' },
-  mercado_pago: { medio: 'mercadopago', columna: 'efectivo' },
-  qr: { medio: 'qr', columna: 'efectivo' },
   tarjeta: { medio: 'tarjeta', columna: 'lista' },
 };
-const ETIQUETA = { efectivo: 'efectivo / transferencia / Mercado Pago / QR', lista: 'tarjeta (un solo pago, sin cuotas)' };
-const ETIQUETA_UNA = { efectivo: 'efectivo, transferencia, Mercado Pago o QR', lista: 'tarjeta (un solo pago, sin cuotas)' };
+const ETIQUETA = { efectivo: 'efectivo o transferencia', lista: 'tarjeta (un solo pago, sin cuotas)' };
 
 const ERRORES = {
+  bolsones_invalidos: 'Los bolsones tienen que ser un entero de 1 en adelante: si pidió medio bolsón o algo parecido, escalá.',
   falta_producto: 'Falta el producto.',
   falta_cantidad: 'Falta la cantidad: pedile los m² (o el largo y el ancho) y volvé a llamar.',
   cantidad_doble: 'Pasá una sola cantidad: m², largo y ancho, o cantidad.',
@@ -170,16 +183,22 @@ const ERRORES = {
 
 const pesosEnteros = (centavos) => Math.trunc(centavos / 100);
 
+/** Lo que acompaña a una compra de más de $1.000.000 (Fran y Tomás, 17/11/2026): si pregunta por cuotas, escala. */
+const AVISO_COMPRA_GRANDE =
+  'Esta compra pasa $1.000.000: si el cliente pregunta por cuotas, financiación o pagar en partes, escalá con el motivo ' +
+  '"pide pagar en partes, compra de $<el total de arriba>". El motivo es para el grupo: no le digas nada de eso al cliente.';
+
 const COTIZAR = {
   definicion: {
     name: 'cotizar',
     description:
       'Calcula el total de un pedido. Es la ÚNICA fuente de montos: todo importe que le digas al cliente tiene que salir de acá, ' +
       'de esta misma respuesta. Pasá el nombre EXACTO del producto como lo devolvió buscar_productos y la cantidad: "m2" ' +
-      '(o "largo" y "ancho" en metros, tal cual los dijo el cliente: no multipliques vos) o "cantidad" (unidades, bolsas o cajas). ' +
-      'Sin forma_pago devuelve los dos totales (efectivo/transferencia y tarjeta); con forma_pago, solo ese. La factura es sin ' +
-      'factura si el cliente no dijo nada; con factura se suma el IVA (lo hace la herramienta). Tarjeta es un solo pago: cuotas, ' +
-      'cheque, pago mixto y dólares los define una persona (escalá). No suma desperdicio salvo que el cliente lo pida. ' +
+      '(o "largo" y "ancho" en metros, tal cual los dijo el cliente: no multipliques vos), "cantidad" (unidades, bolsas o cajas) ' +
+      'o, solo en granza, "bolsones" (cada uno son 20 bolsas). Sin forma_pago devuelve solo el total en efectivo o transferencia: ' +
+      'el de tarjeta solo si el cliente lo pregunta (forma_pago tarjeta). Nunca ofrezcas factura: con con_factura true (si el ' +
+      'cliente la pidió) se suma el IVA, lo hace la herramienta. Tarjeta es un solo pago: cuotas, cheque y dólares los define ' +
+      'una persona (escalá). No suma desperdicio salvo que el cliente lo pida. ' +
       'Si devuelve error, no digas ningún monto y escalá (salvo que el error diga qué corregir).',
     input_schema: objeto(
       {
@@ -188,8 +207,9 @@ const COTIZAR = {
         largo: { type: 'string', description: 'Largo en metros, tal cual lo dijo el cliente. Va junto con ancho.' },
         ancho: { type: 'string', description: 'Ancho en metros, tal cual lo dijo el cliente. Va junto con largo.' },
         cantidad: { type: 'number', description: 'Cantidad de unidades, bolsas o cajas, si el cliente la dio en eso y no en m².' },
-        forma_pago: { type: 'string', enum: Object.keys(FORMAS_DE_PAGO), description: 'Solo si el cliente dijo cómo paga.' },
-        con_factura: { type: 'boolean', description: 'true solo si el cliente pidió factura. Si no dijo nada, false.' },
+        bolsones: { type: 'number', description: 'Solo para granza: cuántos bolsones pide (enteros; cada bolsón son 20 bolsas). Va solo, sin m² ni cantidad.' },
+        forma_pago: { type: 'string', enum: Object.keys(FORMAS_DE_PAGO), description: 'Solo si el cliente dijo cómo paga o preguntó por la tarjeta.' },
+        con_factura: { type: 'boolean', description: 'true solo si el cliente pidió factura. Si no la nombró, false: nunca la ofrezcas.' },
         desperdicio_pct: { type: 'number', description: 'Solo si el cliente pidió sumar desperdicio (por ejemplo 10). Si no, no lo pases.' },
       },
       ['producto']
@@ -206,18 +226,24 @@ const COTIZAR = {
       const parecidos = buscarProductos(cat, nombre, { max: 5 }).map((p) => p.nombre);
       return falla('Ese nombre no está en la lista. Usá buscar_productos y pasá el nombre exacto; si no hay, no lo trabajamos: escalá.', parecidos.length ? { parecidos } : {});
     }
+    // Un color de granza sin stock (`#sinstock`, 17/11/2026) no se cotiza: se le dice que hoy no hay y se ofrecen los otros.
+    if (granza.esGranza(producto) && sinStock(producto.nombre)) {
+      return falla('Hoy no hay de ese color de granza: no lo cotices. Decile que hoy no hay de ese color y ofrecele los otros (los que buscar_productos no marca con hay_stock false).');
+    }
 
     // La cantidad: una sola forma.
     const hayM2 = i.m2 !== undefined && i.m2 !== null && String(i.m2).trim() !== '';
     const hayMedidas = (i.largo !== undefined && i.largo !== null && String(i.largo).trim() !== '') || (i.ancho !== undefined && i.ancho !== null && String(i.ancho).trim() !== '');
     const hayCantidad = i.cantidad !== undefined && i.cantidad !== null && i.cantidad !== '';
-    if ([hayM2, hayMedidas, hayCantidad].filter(Boolean).length > 1) return falla(ERRORES.cantidad_doble);
+    const hayBolsones = i.bolsones !== undefined && i.bolsones !== null && i.bolsones !== '';
+    if ([hayM2, hayMedidas, hayCantidad, hayBolsones].filter(Boolean).length > 1) return falla(ERRORES.cantidad_doble);
+    if (hayBolsones && !granza.esGranza(producto)) return falla('Los bolsones son solo de la granza: en ese producto pasá m², largo y ancho o cantidad.');
     let m2 = null;
     if (hayM2) m2 = String(i.m2).trim();
     else if (hayMedidas) {
       m2 = m2DeLargoYAncho(i.largo, i.ancho);
       if (!m2) return falla('Largo y ancho: pasá los dos, en metros (por ejemplo "3,5" y "3,5").');
-    } else if (!hayCantidad) return falla(ERRORES.falta_cantidad);
+    } else if (!hayCantidad && !hayBolsones) return falla(ERRORES.falta_cantidad);
     if (m2 !== null) {
       const c = aCentesimos(m2);
       if (c === null || c <= 0n) return falla(ERRORES.cantidad_invalida);
@@ -228,7 +254,7 @@ const COTIZAR = {
     let forma = null;
     if (i.forma_pago !== undefined && i.forma_pago !== null && i.forma_pago !== '') {
       forma = FORMAS_DE_PAGO[String(i.forma_pago)];
-      if (!forma) return falla('Esa forma de pago (cuotas, cheque, pago mixto, dólares…) la define una persona: escalá.');
+      if (!forma) return falla('Esa forma de pago no se cotiza (solo efectivo, transferencia o tarjeta). Cuotas, cheque y dólares los define una persona: escalá. Si pide pagar parte en efectivo y parte por transferencia, es lo mismo: cotizá con efectivo.');
     }
     const factura = esVerdadero(i.con_factura);
     let desperdicioPct = 0;
@@ -237,9 +263,10 @@ const COTIZAR = {
       if (!Number.isFinite(desperdicioPct) || desperdicioPct < 0 || desperdicioPct > 20) return falla('El desperdicio tiene que estar entre 0 y 20 %.');
     }
 
-    const pedido = { m2: m2 !== null ? m2 : undefined, cantidad: hayCantidad ? i.cantidad : undefined, config: { desperdicioPct }, medio: forma ? forma.medio : undefined, factura };
+    const pedido = { m2: m2 !== null ? m2 : undefined, cantidad: hayCantidad ? i.cantidad : undefined, bolsones: hayBolsones ? i.bolsones : undefined, config: { desperdicioPct }, medio: forma ? forma.medio : undefined, factura };
     const esGranza = granza.esGranza(producto);
-    const r = esGranza ? granza.cotizarGranza({ producto, ...pedido }) : cotizador.cotizar({ producto, ...pedido });
+    const { bolsones: _b, ...pedidoComun } = pedido;
+    const r = esGranza ? granza.cotizarGranza({ producto, ...pedido }) : cotizador.cotizar({ producto, ...pedidoComun });
     if (r.error) return falla(ERRORES[r.error] || `No se pudo cotizar (${r.error}): escalá.`);
     if (!r.ok) return falla(`FALTA DATO (${(r.faltaDato || []).join(', ') || 'precio'}): no digas ningún monto y escalá.`, { faltaDato: r.faltaDato || [] });
     // Obra grande por lo que cubre (cajas, bolsas…): también la ve una persona.
@@ -256,12 +283,9 @@ const COTIZAR = {
               : 0;
     if (cubre > M2_MAXIMO) return falla(`Más de ${M2_MAXIMO} m²: es una obra grande y la ve una persona. Escalá.`);
 
-    // Qué columnas se muestran: las dos, o la de la forma de pago.
-    let columnas = forma ? [forma.columna] : ['efectivo', 'lista'];
-    // Sin forma de pago y sin el precio con tarjeta (granza de 15 a 19 bolsas, 16/11/2026): sale solo el efectivo
-    // y Erasmo no dice nada de la tarjeta. Si el cliente paga con tarjeta, `cotizar` con esa forma da FALTA DATO.
-    const sinTarjeta = esGranza && !forma && r.efectivo && r.efectivo.ok && !(r.lista && r.lista.ok);
-    if (sinTarjeta) columnas = ['efectivo'];
+    // Qué columna se muestra: la de la forma de pago; sin forma de pago, solo efectivo o transferencia (Fran y Tomás,
+    // 17/11/2026: la tarjeta se pasa solo si el cliente la pide, porque el posnet todavía no llegó).
+    const columnas = [forma ? forma.columna : 'efectivo'];
     const totales = [];
     for (const col of columnas) {
       const c = col === 'lista' ? r.lista : r.efectivo;
@@ -285,19 +309,31 @@ const COTIZAR = {
     for (const t of totales) turno.montos.push(pesosEnteros(t.centavos));
     for (const t of porUnidad || []) turno.montos.push(pesosEnteros(t.centavos));
     // Para la ficha del chat.
-    turno.cotizo = { producto: producto.nombre, cantidad: decimalComoTexto(r.cantidad), unidad: unidadTexto(r.unidad), pago: forma ? i.forma_pago : 'los dos', factura };
+    // Lo que se cotizó, para la ficha: el total más alto de los que salieron (en centavos) sirve para ver si la compra pasa
+    // el millón (ficha.pasaElUmbralDePagarEnPartes).
+    const totalCentavos = Math.max(...totales.map((t) => t.centavos));
+    turno.cotizo = {
+      producto: producto.nombre,
+      cantidad: r.bolsones !== undefined ? String(r.bolsones) : decimalComoTexto(r.cantidad),
+      unidad: r.bolsones !== undefined ? (r.bolsones === 1 ? 'bolsón' : 'bolsones') : unidadTexto(r.unidad),
+      pago: forma ? i.forma_pago : 'efectivo',
+      factura,
+      totalCentavos,
+    };
 
-    const etiqueta = forma ? ETIQUETA_UNA : ETIQUETA;
+    const etiqueta = ETIQUETA;
     const cantidadTexto = esGranza
-      ? `${r.bolsas} bolsas (1 bolsa rinde cerca de 1 m² a 3 cm)`
+      ? r.bolsones !== undefined
+        ? `${r.bolsones} ${r.bolsones === 1 ? 'bolsón' : 'bolsones'} (${r.bolsas} bolsas de 40 kg)`
+        : `${r.bolsas} bolsas (1 bolsa rinde cerca de 1 m² a 3 cm)`
       : `${decimalComoTexto(r.cantidad)} ${r.unidad === 'm2' ? 'm²' : r.cantidad === '1' ? unidadTexto(r.unidad) : PLURAL[r.unidad] || r.unidad}`;
     const out = {
       ok: true,
       producto: producto.nombre,
       cantidad: cantidadTexto,
       ...(r.m2Cubiertos !== undefined && !esGranza ? { m2_que_cubre: `${decimalComoTexto(r.m2Cubiertos)} m²` } : {}),
-      factura: factura ? 'CON factura (IVA 21 % incluido en los totales)' : 'SIN factura',
-      ...(sinTarjeta ? { aviso_tarjeta: 'El precio con tarjeta de esta cantidad no está cargado: no lo digas ni digas que no está. Pasá solo el total en efectivo o transferencia; si paga con tarjeta, escalá.' } : {}),
+      factura: factura ? 'CON factura (IVA 21 % incluido en los totales)' : 'no pidió factura: no la menciones ni la ofrezcas',
+      ...(ficha.pasaElUmbralDePagarEnPartes(totalCentavos) ? { compra_grande: AVISO_COMPRA_GRANDE } : {}),
       totales: totales.map((t) => ({ forma_de_pago: etiqueta[t.col], total: cotizador.formatearPesos(t.centavos) })),
       ...(porUnidad
         ? {
@@ -308,8 +344,8 @@ const COTIZAR = {
           }
         : {}),
       aviso:
-        (factura ? 'Decí cuánto es y que es con factura. ' : 'Decí cuánto es; no escribas "sin factura": cerrá con "🧾 + IVA si necesitás factura". ') +
-        (forma ? '' : 'Si el cliente todavía no dijo cómo paga, da los dos totales. ') +
+        (factura ? 'Decí cuánto es y que es con factura. ' : 'Decí cuánto es; no escribas "sin factura" ni ofrezcas factura ni menciones el IVA. ') +
+        (forma ? '' : 'Es el total en efectivo o transferencia: no menciones la tarjeta salvo que el cliente la pregunte. ') +
         'El precio de una unidad solo si el cliente lo pidió. No sumes ni restes nada vos.',
     };
     if (cat.desactualizado) out.aviso += ' (Los precios son de la última copia guardada: no cambia lo que le decís.)';
