@@ -20,6 +20,7 @@ const p = require('./piedra-ayuda')({ CEREBRO_MODO: 'todos' });
 const { bot, sonnet, aClientes, alGrupo, mensaje, propio, state, jid, cerebro, eventos } = p;
 const promesas = require('../src/promesas');
 const fs = require('fs');
+const stock = require('../src/stock-colores');
 const path = require('path');
 // El catálogo en PDF (de mentira) en la carpeta de documentos de la prueba. La granza sale de su tabla (sin panel).
 fs.mkdirSync(process.env.DOCS_DIR, { recursive: true });
@@ -55,25 +56,25 @@ const CASOS = [
     chequeo: ({ cliente, grupo }) => (cliente.length !== 2 ? `le llegó ${JSON.stringify(cliente)}` : grupo.length ? 'avisó al grupo' : null),
   },
   {
-    nombre: 'cotiza granza 12 m2: salen los montos que devolvió cotizar, con "sin factura", y queda en la ficha',
+    nombre: 'cotiza granza 12 m2: sale solo el monto en efectivo o transferencia que devolvió cotizar (sin ofrecer factura) y queda en la ficha con el total',
     pasos: [{ c: 'cuanto sale la granza roja para 12 m2?' }],
     sonnet: [
       [sonnet.usar('cotizar', { producto: 'Granza roja', m2: '12' })],
-      sonnet.responde(['Para 12 m² son 12 bolsas.', 'En efectivo o transferencia $240.000 y con tarjeta $300.000, sin factura.']),
+      sonnet.responde(['Para 12 m² son 12 bolsas.', 'En efectivo o transferencia $240.000.']),
     ],
     chequeo: ({ cliente, s }) =>
-      cliente.join('|') !== 'Para 12 m² son 12 bolsas.|En efectivo o transferencia $240.000 y con tarjeta $300.000, sin factura.'
+      cliente.join('|') !== 'Para 12 m² son 12 bolsas.|En efectivo o transferencia $240.000.'
         ? `salió ${JSON.stringify(cliente)}`
-        : !s.ficha || !s.ficha.pidio || s.ficha.pidio.producto !== 'Granza roja'
+        : !s.ficha || !s.ficha.pidio || s.ficha.pidio.producto !== 'Granza roja' || s.ficha.pidio.totalCentavos !== 24000000
           ? 'no quedó la ficha'
           : null,
   },
   {
-    nombre: 'cotiza con factura: el IVA lo suma la herramienta también sobre la tarjeta (granza 5 m2)',
+    nombre: 'cotiza con factura (solo porque la pidió): el IVA lo suma la herramienta (granza 5 m2)',
     pasos: [{ c: 'granza roja 5 m2, con factura' }],
     sonnet: [
       [sonnet.usar('cotizar', { producto: 'Granza roja', m2: '5', con_factura: true })],
-      sonnet.responde(['Con factura: $133.100 en efectivo o transferencia y $160.300 con tarjeta.']),
+      sonnet.responde(['Con factura: $133.100 en efectivo o transferencia.']),
     ],
     chequeo: ({ cliente }) => (cliente.length !== 1 || !/133\.100/.test(cliente[0]) ? `salió ${JSON.stringify(cliente)}` : null),
   },
@@ -83,9 +84,9 @@ const CASOS = [
     sonnet: [
       [sonnet.usar('cotizar', { producto: 'Granza gris Tandil', m2: '12', forma_pago: 'efectivo' })],
       sonnet.responde(['Te sale $250.000.']),
-      sonnet.responde(['Te sale $240.000, sin factura.']),
+      sonnet.responde(['Te sale $240.000.']),
     ],
-    chequeo: ({ cliente, pedidos }) => (cliente.join() !== 'Te sale $240.000, sin factura.' ? `salió ${JSON.stringify(cliente)}` : pedidos !== 3 ? `hubo ${pedidos} pedidos` : null),
+    chequeo: ({ cliente, pedidos }) => (cliente.join() !== 'Te sale $240.000.' ? `salió ${JSON.stringify(cliente)}` : pedidos !== 3 ? `hubo ${pedidos} pedidos` : null),
   },
   {
     nombre: 'un producto que no está en la lista: cotizar da error y escala, el cliente solo recibe "Enseguida te respondemos."',
@@ -180,6 +181,125 @@ const CASOS = [
     chequeo: ({ cliente, grupo, pedidos }) =>
       pedidos ? 'le preguntó a Sonnet' : cliente.length ? `le llegó ${JSON.stringify(cliente)}` : !grupo.some((t) => /^🚫 Excluido/.test(t)) ? 'no confirmó con 🚫 en el grupo' : null,
   },
+  // --- Corrida 17/11/2026 (Fran y Tomás): bolsón, tarjeta, envíos, cuotas, color sin stock ---
+  {
+    nombre: 'bolsón de granza gris: 1 bolsón = 20 bolsas, sale $310.000 en efectivo o transferencia (cuenta del código)',
+    pasos: [{ c: 'cuanto sale el bolson de granza gris?' }],
+    sonnet: [
+      [sonnet.usar('cotizar', { producto: 'Granza gris Tandil', bolsones: 1 })],
+      sonnet.responde(['Sí, tenemos bolsón.', '🪨 Granza gris Tandil\n📦 1 bolsón (20 bolsas de 40 kg)\n💵 Efectivo o transferencia: $310.000']),
+    ],
+    chequeo: ({ cliente, s }) =>
+      !cliente.some((t) => /\$310\.000/.test(t)) ? `salió ${JSON.stringify(cliente)}` : !s.ficha || !s.ficha.pidio || s.ficha.pidio.unidad !== 'bolsón' ? 'no quedó el bolsón en la ficha' : null,
+  },
+  {
+    nombre: '16 bolsas de granza con tarjeta: $304.000 (tramo de 15 a 19 bolsas, $19.000 la bolsa)',
+    pasos: [{ c: 'y con tarjeta cuanto sale la granza roja para 16 m2?' }],
+    sonnet: [
+      [sonnet.usar('cotizar', { producto: 'Granza roja', m2: '16', forma_pago: 'tarjeta' })],
+      sonnet.responde(['Con tarjeta, en un pago, te queda en $304.000.']),
+    ],
+    chequeo: ({ cliente }) => (cliente.join() !== 'Con tarjeta, en un pago, te queda en $304.000.' ? `salió ${JSON.stringify(cliente)}` : null),
+  },
+  {
+    nombre: 'confirma que paga con tarjeta: escala con "¿ya está el posnet?" (al cliente le llega el precio y después solo "Enseguida te respondemos.")',
+    pasos: [{ c: 'y con tarjeta cuanto sale la granza roja para 10 m2?' }, { c: 'dale, con tarjeta' }],
+    sonnet: [
+      [sonnet.usar('cotizar', { producto: 'Granza roja', m2: '10', forma_pago: 'tarjeta' })],
+      sonnet.responde(['Con tarjeta, en un pago, te queda en $250.000.']),
+      sonnet.escala('quiere pagar con tarjeta: ¿ya está el posnet?'),
+    ],
+    chequeo: ({ cliente, grupo, s }) =>
+      cliente.join('|') !== `Con tarjeta, en un pago, te queda en $250.000.|${AVISO_ESCALADO}`
+        ? `salió ${JSON.stringify(cliente)}`
+        : !grupo.some((t) => /🔕/.test(t) && /posnet/.test(t))
+          ? 'no avisó al grupo'
+          : !s.escalado
+            ? 'no quedó escalado'
+            : null,
+  },
+  {
+    nombre: 'pide envío sin decir dónde: le pregunta la localidad (no escala todavía)',
+    pasos: [{ c: 'hacen envios? quiero 12 m2 de granza roja' }],
+    sonnet: [sonnet.responde(['Sí, entregamos. A qué localidad sería?'])],
+    chequeo: ({ cliente, grupo, s }) => (cliente.join() !== 'Sí, entregamos. A qué localidad sería?' ? `salió ${JSON.stringify(cliente)}` : grupo.length || s.escalado ? 'escaló antes de saber la localidad' : null),
+  },
+  {
+    nombre: 'envío a Plottier: escala con el motivo armado y el sugerido de $45.000 (el monto del motivo no frena; al cliente solo "Enseguida te respondemos.")',
+    pasos: [{ c: 'es para plottier, me lo llevan? 12 m2 de granza roja' }],
+    sonnet: [sonnet.escala('pide envío a Plottier, granza roja 12 m² → sugerido $45.000')],
+    chequeo: ({ cliente, grupo, s }) =>
+      soloElAviso(cliente) || (!grupo.some((t) => /🔕/.test(t) && /Plottier/.test(t) && /sugerido \$45\.000/.test(t)) ? 'el grupo no recibió el motivo con el sugerido' : !s.escalado ? 'no quedó escalado' : null),
+  },
+  {
+    nombre: 'envío a Neuquén capital: escala con el sugerido de $35.000',
+    pasos: [{ c: 'soy de neuquen capital, me lo traen? 14 m2 de laja' }],
+    sonnet: [sonnet.escala('pide envío a Neuquén capital, laja 14 m² → sugerido $35.000')],
+    chequeo: ({ cliente, grupo }) => soloElAviso(cliente) || (!grupo.some((t) => /sugerido \$35\.000/.test(t)) ? 'el grupo no recibió el sugerido' : null),
+  },
+  {
+    nombre: 'un camión de granza: escala',
+    pasos: [{ c: 'necesito un camion de granza' }],
+    sonnet: [sonnet.escala('pide un camión de granza')],
+    chequeo: ({ cliente, grupo }) => soloElAviso(cliente) || (!grupo.some((t) => /camión de granza/.test(t)) ? 'no avisó al grupo' : null),
+  },
+  {
+    nombre: 'cuotas en una compra de $1.550.000 (5 bolsones): el pedido ya dice que es compra grande y escala con "pide pagar en partes, compra de $1.550.000"',
+    pasos: [{ c: 'cuanto salen 5 bolsones de granza roja?' }, { c: 'se puede pagar en cuotas?' }],
+    sonnet: [
+      [sonnet.usar('cotizar', { producto: 'Granza roja', bolsones: 5 })],
+      sonnet.responde(['🪨 Granza roja\n📦 5 bolsones (100 bolsas de 40 kg)\n💵 Efectivo o transferencia: $1.550.000']),
+      sonnet.escala('pide pagar en partes, compra de $1.550.000'),
+    ],
+    chequeo: ({ cliente, grupo, pedidos }) =>
+      pedidos !== 3
+        ? `hubo ${pedidos} pedidos`
+        : !/es una compra grande/.test(sonnet.textoDelPedido(2))
+          ? 'el pedido no decía que era una compra grande'
+          : cliente[cliente.length - 1] !== AVISO_ESCALADO
+            ? `salió ${JSON.stringify(cliente)}`
+            : !grupo.some((t) => /🔕/.test(t) && /pide pagar en partes, compra de \$1\.550\.000/.test(t))
+              ? 'el grupo no recibió el motivo'
+              : null,
+  },
+  {
+    nombre: 'cuotas en una compra de $240.000: el pedido dice que no es grande y contesta "Por ahora no tenemos cuotas." sin escalar',
+    pasos: [{ c: 'granza roja 12 m2' }, { c: 'se puede pagar en cuotas?' }],
+    sonnet: [
+      [sonnet.usar('cotizar', { producto: 'Granza roja', m2: '12' })],
+      sonnet.responde(['Para 12 m² son 12 bolsas.', 'En efectivo o transferencia $240.000.']),
+      sonnet.responde(['Por ahora no tenemos cuotas.']),
+    ],
+    chequeo: ({ cliente, grupo, pedidos, s }) =>
+      pedidos !== 3
+        ? `hubo ${pedidos} pedidos`
+        : !/no es una compra grande/.test(sonnet.textoDelPedido(2))
+          ? 'el pedido no decía que no era una compra grande'
+          : cliente[cliente.length - 1] !== 'Por ahora no tenemos cuotas.'
+            ? `salió ${JSON.stringify(cliente)}`
+            : grupo.length || s.escalado
+              ? 'escaló'
+              : null,
+  },
+  {
+    nombre: 'granza roja sin stock (#sinstock roja): cotizar no la cotiza, no sale ningún monto y el pedido le dice a Sonnet que no la ofrezca',
+    pasos: [{ grupo: '#sinstock roja' }, { c: 'quiero granza roja para 10 m2' }],
+    sonnet: [
+      [sonnet.usar('cotizar', { producto: 'Granza roja', m2: '10' })],
+      sonnet.responde(['Hoy no tenemos granza roja.', 'Tenemos gris Tandil y blanca Mar del Plata, al mismo precio. Cuál te gusta?']),
+    ],
+    chequeo: ({ cliente, grupo }) =>
+      !stock.haySinStock('Granza roja')
+        ? '#sinstock no quedó'
+        : !/hoy NO hay stock de: Granza roja/.test(sonnet.textoDelPedido(0))
+          ? 'el pedido no decía que no hay roja'
+          : cliente.length !== 2 || cliente.some((t) => /\$/.test(t))
+            ? `salió ${JSON.stringify(cliente)}`
+            : !grupo.some((t) => /sin stock/i.test(t))
+              ? 'no confirmó el #sinstock en el grupo'
+              : null,
+    despues: () => stock.desdeGrupo({ tipo: 'hay', resto: 'gris, roja, blanca' }),
+  },
 ];
 
 /**
@@ -219,6 +339,7 @@ function reglasGlobales(cliente, permitidos = []) {
     // Los montos que dejaron escribir las herramientas en la tanda (el registro de aprendizaje los anota).
     const permitidos = eventos(num, 'propuesta').flatMap((e) => (e.sonnet && e.sonnet.montos) || []);
     const problemas = [caso.chequeo(ctx), ...reglasGlobales(cliente, permitidos)].filter(Boolean);
+    if (caso.despues) caso.despues();
     if (!problemas.length) bien++;
     console.log(`  ${problemas.length ? 'FALLA' : 'ok   '} ${caso.nombre}${problemas.length ? ' -> ' + problemas.join('; ') : ''}`);
     if (VERBOSO) {
