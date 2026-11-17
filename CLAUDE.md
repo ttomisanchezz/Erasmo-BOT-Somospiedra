@@ -95,9 +95,12 @@ ese día no le llegaba nada). Lo manda el código, no Sonnet: `escalarEnSilencio
 - Sonnet termina siempre con `responder` (1 a 4 mensajes) o `escalar` (motivo para el grupo). Lo que no
   termina así cuenta como escalar.
 - `cerebro-reglas.md` son las reglas **aprobadas por Tomás el 06/11/2026** (`reglas/cerebro-reglas-piedra.md`, v2),
-  adaptadas a lo que existe hoy: sin ningún monto escrito (los pone el código), y lo que todavía no hay
-  (simulador, fotos de las piedras, presupuesto en PDF, dólares, costo y zonas de envío) **escala**. Si se cambian
-  las de `reglas/`, hay que volver a adaptarlas acá. El hash de las reglas sale en `/salud` y en cada propuesta.
+  adaptadas a lo que existe hoy, y puestas al día con las respuestas de Fran y Tomás del 16-17/11/2026 (v3, ver el
+  recuadro al principio de `reglas/cerebro-reglas-piedra.md` y "Corrida 2026-11-17a" en `REVISAR.md`): ningún monto
+  que se le diga al cliente (los pone el código; la única excepción son los $35.000 / $45.000 del envío, que van solo
+  para el motivo del grupo), y lo que todavía no hay (simulador, fotos de las piedras, presupuesto en PDF, costo y zonas
+  de envío, dólares, cheque, tarjeta confirmada, cuotas en una compra grande) **escala**. Si se cambian las de
+  `reglas/`, hay que volver a adaptarlas acá. El hash de las reglas sale en `/salud` y en cada propuesta.
 - **La guardia** (`revisarSalida`): 4×300; cualquier monto que no devolvió una herramienta de ESTA
   respuesta frena (los montos van en pesos; un año suelto o la altura de una dirección no son montos); promesas
   (`src/promesas.js`), "te falta", mandar algo después, archivos (**salvo el catálogo en PDF, y solo si
@@ -125,8 +128,9 @@ ese día no le llegaba nada). Lo manda el código, no Sonnet: `escalarEnSilencio
 ## Módulos de Piedra ya hechos (no se tocan sin decidir con Tomás)
 
 - `src/cotizador-piedra.js` (16/10/2026; cambiado el 09/11/2026): dos precios por producto, **EFECTIVO**
-  (efectivo, transferencia, Mercado Pago, QR) y **LISTA** (tarjeta, cheque, postnet). **Con factura, +21 % sobre la
-  columna que sea (también la lista)** (decisión del 30/10) y **redondeo para abajo a la centena de pesos en cada
+  (efectivo o transferencia; Mercado Pago y QR ya no se ofrecen, 17/11) y **LISTA** (tarjeta, cheque, postnet). **Con factura, +21 % sobre la
+  columna que sea (también la lista)** (decisión del 30/10; desde el 17/11 Erasmo NO ofrece factura ni dice "+ IVA": solo si
+  el cliente la pide) y **redondeo para abajo a la centena de pesos en cada
   total** (02/11); el orden: precio × cantidad → IVA → centena. Centavos enteros, sin flotantes. Lo que falta sale
   como **FALTA DATO** (un total que da menos de $100 también). Unidades enteras: unidad, bolsa, bolsón, **caja,
   malla**, litro. Test: `test/cotizador-piedra.test.js`.
@@ -148,10 +152,18 @@ Cómo prenderlo: `PRENDER-TESTER.md`. Qué revisar (cuentas y decisiones de plat
   granza del panel se ignora. Caché en memoria de 10 min + copia en `data/precios/panel-cache.json`; si Supabase
   falla, la última copia buena (con un respiro de 60 s sin volver a pedir); si nunca cargó, FALTA DATO. Con filas de
   más de un negocio, todo FALTA DATO. Test: `test/precios-panel.test.js` (Supabase de mentira).
-- `src/granza.js`: la granza NO está en el panel: tabla de tramos en un solo lugar (por bolsa: efectivo $22.000 /
-  $20.000 / $15.500, tarjeta $26.500 / $25.000 / $19.000, con los dos precios que fijó Tomás el 11/11/2026: 20 m² en
-  efectivo $310.000 y 1 m² con tarjeta $26.500; **supuesto**: tramos de 1 a 9, 10 a 19 y desde 20 bolsas),
-  por m², 1 bolsa = 1 m² a 3 cm, nunca por bolsón. Test: `test/granza.test.js`.
+- `src/granza.js`: la granza NO está en el panel: tabla de tramos en un solo lugar. **Tabla final (Fran y Tomás,
+  17/11/2026), por bolsa: efectivo 1-9 $22.000 · 10-14 $20.000 · 15-19 $16.000 · 20+ $15.500; tarjeta 1-9 $26.500 ·
+  10-14 $25.000 · 15-19 $19.000 · 20+ $19.000.** Por m², 1 bolsa = 1 m² a 3 cm. **El bolsón SÍ se vende** (1 bolsón = 1 m³ =
+  20 bolsas de 40 kg, se cobra el tramo 20+: $310.000 en efectivo, $380.000 con tarjeta): `cotizar` acepta `bolsones`
+  (enteros) y el código multiplica por 20; 6 bolsones o más pasan el tope de 100 m² y escalan. Un camión de granza
+  escala. 14 bolsas salen más caras que 15 (se cobra el precio de la banda). Test: `test/granza.test.js`.
+- `src/stock-colores.js` (17/11/2026): `#sinstock <color>` / `#hay <color>` en el grupo "Bot Erasmo" (gris, roja,
+  blanca; acepta "gris tandil", "blanca mdp", varios a la vez; mal escrito → ❓ y no cambia nada; `#sinstock` solo
+  lista lo que falta). Vive en `estado.json` (clave interna: sobrevive reinicios, `#reset` no lo toca); arranca todo en
+  stock. Mientras un color falta: `cotizar` no lo cotiza (error), `buscar_productos` lo marca `hay_stock: false` y el
+  pedido a Sonnet dice "hoy NO hay stock de…" (no lo ofrece ni lo menciona; si el cliente lo pide, le dice que hoy no hay
+  y ofrece los otros). Solo granza. Tests: `test/stock-colores.test.js`, `erasmo-herramientas`, `erasmo-fran-1117`.
 - `src/herramientas-erasmo.js`: `buscar_productos` (nombres exactos, sin precios), `cotizar` (producto exacto + m² /
   largo y ancho / cantidad, forma de pago, con o sin factura → los totales ya escritos; tarjeta un solo pago; sin
   cuotas, cheque, pago mixto ni dólares; más de 100 m² escala; la multiplicación de largo × ancho la hace el
@@ -177,8 +189,8 @@ Cómo prenderlo: `PRENDER-TESTER.md`. Qué revisar (cuentas y decisiones de plat
 - `npm run grupos` (`herramientas/grupos/listar.js`): lista nombre + JID de los grupos de la instancia (solo lee; no
   imprime claves). `npm run pruebas -- 5492994295806` (`herramientas/pruebas/armar.js`): arma `data/pruebas/<fecha>.md`
   con la charla del tester (tandas, herramientas con montos, escaladas, frenos de la guardia); solo lee.
-- Tests: `granza`, `precios-panel`, `grupos`, `erasmo-herramientas`, `erasmo-tester` (modo tester, catálogo,
-  seguimiento, cola de avisos, candados) y `pruebas`. `test/piedra-ayuda.js` fija la franja de avisos de 0 a 24 y el
+- Tests: `granza`, `precios-panel`, `grupos`, `erasmo-herramientas`, `stock-colores`, `erasmo-fran-1117` (el pedido
+  con stock y cuotas), `erasmo-tester` (modo tester, catálogo, seguimiento, cola de avisos, candados) y `pruebas`. `test/piedra-ayuda.js` fija la franja de avisos de 0 a 24 y el
   caché de precios en la carpeta temporal.
 
 ## Archivos que genera el bot (`src/generados.js`, 29/10/2026)
@@ -263,7 +275,8 @@ contesta lo que dejó escrito), `#reset`, `#recordar <qué>` / `#hecho`, `#vendi
 **En el grupo interno**, con el número: `#pausa <n>`, `#sigue <n>`, `#vendido <n>`, `#perdido <n>`,
 `#sonnet <n>` (qué contestaría, sin mandar nada), `#comparar <n>`, `#bot <n>` (sin Sonnet: queda en
 sombra), `#sonnet-si <n>`, `#excluir <n>` / `#incluir <n>` (sirve pegar un wa.me; se puede excluir un número
-que nunca escribió); sin número: `#excluidos` (la lista), `#apagar` / `#prender` (interruptor general,
+que nunca escribió); sin número: `#sinstock <color>` / `#hay <color>` (un color de granza sin stock; `#sinstock` solo lista),
+`#excluidos` (la lista), `#apagar` / `#prender` (interruptor general,
 local). **Desde el celular del tester**: `#reset`. Cada comando contesta en el grupo cómo se usa si se
 escribe mal (no hay un `#ayuda` central: cada módulo tiene su `COMO_SE_USA`).
 
@@ -301,7 +314,7 @@ audios), `MODO_ESCUCHA`, `MODO_BORRADOR`, `NUMEROS_TESTER`, `NUMEROS_PILOTO`, `C
 
 | Carpeta | Qué hay |
 |---|---|
-| `src/` | El bot: `index.js` (webhook, tandas, comandos, barridos), `cerebro.js` + `cerebro-reglas.md`, `config.js`, `state.js`, `evolution.js`, `control.js`, `contexto.js`, `audio.js` + `gemini.js`, `guardian.js`, `chats-viejos.js`, `autoria.js`, `aprendizaje.js`, `sombra-persona.js`, `cerebro-comandos.js`, `interruptor.js`, `promesas.js`, `recordatorios.js`, `ventas.js`, `excluidos.js`, `generados.js`, `salida.js`, `avisos-texto.js`, los de Piedra `cotizador-piedra.js` y `catalogo-piedra.js`, y los del modo tester (09/11): `precios-panel.js`, `granza.js`, `herramientas-erasmo.js`, `avisos-cola.js`, `seguimiento.js` y `ficha.js`. |
+| `src/` | El bot: `index.js` (webhook, tandas, comandos, barridos), `cerebro.js` + `cerebro-reglas.md`, `config.js`, `state.js`, `evolution.js`, `control.js`, `contexto.js`, `audio.js` + `gemini.js`, `guardian.js`, `chats-viejos.js`, `autoria.js`, `aprendizaje.js`, `sombra-persona.js`, `cerebro-comandos.js`, `interruptor.js`, `promesas.js`, `recordatorios.js`, `ventas.js`, `excluidos.js`, `stock-colores.js`, `generados.js`, `salida.js`, `avisos-texto.js`, los de Piedra `cotizador-piedra.js` y `catalogo-piedra.js`, y los del modo tester (09/11): `precios-panel.js`, `granza.js`, `herramientas-erasmo.js`, `avisos-cola.js`, `seguimiento.js` y `ficha.js`. |
 | `test/` | Los tests y los scripts (`evaluar.js`, `aprender.js`, `destino.js`, `sembrar-viejos.js`, `probar-contexto.js`). |
 | `reglas/` | Reglas y casos de Piedra (Etapa 2; las reglas del cerebro, aprobadas el 06/11, están copiadas y adaptadas en `src/cerebro-reglas.md`). |
 | `herramientas/historial/` | Exportador y clasificador del historial de Evolution (Etapa 1). |
@@ -316,7 +329,9 @@ audios), `MODO_ESCUCHA`, `MODO_BORRADOR`, `NUMEROS_TESTER`, `NUMEROS_PILOTO`, `C
 
 - Saludo automático del día (se fue con `responder.js`): hoy no hay; lo decide Tomás.
 - Resumen de la mañana: se fue (era de iPhone); si se quiere para Piedra, se diseña de nuevo. (El seguimiento ya está: Erasmo anota "volver a contactar el día X" y ese día sale un aviso al grupo; no le escribe al cliente cada 2 días.)
-- Tramos de la granza (supuesto 1-9 / 10-19 / 20+; 19 bolsas salen más caras que 20), tope de antigüedad de la copia de precios, y si Erasmo confirma las zonas de envío de la ronda 2 (hoy escala): ver `REVISAR.md`.
+- Tope de antigüedad de la copia de precios: ver `REVISAR.md`. (Los tramos de la granza y el precio de tarjeta de 15 a 19 bolsas quedaron resueltos el 17/11; los envíos siguen escalando siempre, ahora con el motivo armado: Neuquén capital $35.000 / otro lugar $45.000 sugeridos.)
+- **Responder y escalar en el mismo turno** (17/11/2026): hoy Sonnet termina con `responder` o con `escalar`, y al escalar el cliente solo recibe "Enseguida te respondemos.". Por eso Erasmo no dice "Cuotas no tenemos, pero en compras grandes se puede ver pagar en partes" (compra de más de $1.000.000) ni "los dólares se aceptan al promedio del blue" antes de pasar el chat: solo escala. Si Tomás quiere que lo diga, hay que cambiar el diseño de `escalar` (ver "Corrida 2026-11-17a" en `REVISAR.md`).
+- Sin forma de pago, `cotizar` da solo el total en efectivo o transferencia (la tarjeta, si la pide el cliente): es mi lectura de la nota de Fran del 17/11; confirmar.
 - Las 5 preguntas de precios del traspaso del 16/10 y las de `preguntas-para-fran-v2.md`.
 - Cuánto se guardan los archivos de `data/generados/` (spec del simulador §12.4): hoy no se borra nada.
 - Conectar `enviarGenerado` al cerebro (`simular_piedra`, `presupuesto_pdf`): fase F2 de la spec del simulador.

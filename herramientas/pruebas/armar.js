@@ -33,7 +33,7 @@ function resumenDeSalida(h, s) {
   if (!s || typeof s !== 'object') return recorte(JSON.stringify(s), 160);
   if (s.error) return `ERROR: ${recorte(s.error, 200)}${s.faltaDato ? ` (faltaDato: ${s.faltaDato.join(', ')})` : ''}${s.parecidos ? ` (parecidos: ${s.parecidos.join(', ')})` : ''}`;
   if (h === 'cotizar') {
-    const partes = [`${s.producto} · ${s.cantidad}${s.m2_que_cubre ? ` (cubre ${s.m2_que_cubre})` : ''} · ${s.factura}`];
+    const partes = [`${s.producto} · ${s.cantidad}${s.m2_que_cubre ? ` (cubre ${s.m2_que_cubre})` : ''} · ${/^CON factura/.test(s.factura || "") ? "CON factura" : "SIN factura"}`];
     for (const t of s.totales || []) partes.push(`${t.forma_de_pago}: ${t.total}`);
     if (s.precio_de_una_unidad) partes.push(`precio de 1 ${s.precio_de_una_unidad.unidad}: ${(s.precio_de_una_unidad.por_forma_de_pago || []).map((x) => x.precio).join(' / ')}`);
     return partes.join(' | ');

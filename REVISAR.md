@@ -117,3 +117,47 @@ Para decidir (lo resolví por el camino más conservador; ver "Pendientes de dec
 9. **Borde conocido (ya existía para cualquier envío del bot):** si Evolution da error o se cuelga DESPUÉS de haber entregado el mensaje, su eco no se reconoce como del bot y cuenta como una persona de la cuenta: el escalado queda "tomado" (sin ⏰) y el bot calla 45 minutos en ese chat. No lo cambié: reconocer el eco por el texto haría que una persona que escriba esa misma frase a mano no cuente como persona.
 
 Tests: los que decían "al cliente nada" al escalar ahora esperan ese único mensaje (`piedra-sonnet`, `piedra-control`, `piedra-tandas`, `erasmo-tester`, `evaluar`); casos nuevos para cada candado en `piedra-control` (verificados con mutaciones: sacando el candado, el test falla), `excluidos` (freno c2), `erasmo-tester` (de noche) y `pruebas`.
+
+## Corrida 2026-11-17a: Erasmo con las respuestas de Fran y Tomás del 16-17/11
+
+Cerrado por Fran y Tomás (no se vuelve a decidir). Qué cambió: `src/granza.js`, `src/herramientas-erasmo.js` (`cotizar` y `buscar_productos`), `src/ficha.js`, `src/cerebro.js` (el pedido a Sonnet), `src/stock-colores.js` (nuevo: `#sinstock` / `#hay`), `src/cerebro-reglas.md` (v3) y los tests. **Cuentas y plata: revisar las tablas de abajo.**
+
+**Granza: precio por bolsa y totales (el cotizador no cambió: precio × bolsas → IVA 21 % si pide factura → para abajo a la centena)**
+
+| Tramo | Efectivo o transferencia | Tarjeta (un pago) |
+|---|---|---|
+| 1 a 9 bolsas | $22.000 | $26.500 |
+| 10 a 14 | $20.000 | $25.000 |
+| 15 a 19 | $16.000 | **$19.000** (era FALTA DATO) |
+| 20 o más | $15.500 | $19.000 |
+
+| Cantidad | Efectivo | Tarjeta | Efectivo con factura | Tarjeta con factura |
+|---|---|---|---|---|
+| 1 bolsa | $22.000 | $26.500 | $26.600 | $32.000 |
+| 9 bolsas | $198.000 | $238.500 | $239.500 | $288.500 |
+| 10 bolsas | $200.000 | $250.000 | $242.000 | $302.500 |
+| 12 bolsas | $240.000 | $300.000 | $290.400 | $363.000 |
+| 14 bolsas | $280.000 | $350.000 | $338.800 | $423.500 |
+| 15 bolsas | $240.000 | $285.000 | $290.400 | $344.800 |
+| 16 bolsas | $256.000 | $304.000 | $309.700 | $367.800 |
+| 19 bolsas | $304.000 | $361.000 | $367.800 | $436.800 |
+| 20 bolsas | $310.000 | $380.000 | $375.100 | $459.800 |
+| 25 bolsas | $387.500 | $475.000 | $468.800 | $574.700 |
+
+- **14 bolsas salen más caras que 15** (efectivo $280.000 contra $240.000; tarjeta $350.000 contra $285.000). Es la tabla que pasaron: el código cobra el precio del tramo y no lo corrige. Igual pasa con 19 contra 20 en efectivo ($304.000 contra $310.000).
+- **Bolsón** (1 bolsón = 1 m³ = 20 bolsas de 40 kg, se cobra el tramo 20+): 1 bolsón $310.000 efectivo / $380.000 tarjeta; 2 bolsones $620.000 / $760.000; 3 bolsones $930.000 / $1.140.000; 5 bolsones $1.550.000 / $1.900.000. 5 bolsones son 100 bolsas = justo el tope de obra grande; **6 bolsones o más escalan** (más de 100 m²). Medio bolsón o fracciones: escala.
+- **Cuotas**: "compra grande" = lo último cotizado pasa de **$1.000.000** (mayor; exactamente $1.000.000 no). La cuenta la hace el código (`ficha.pasaElUmbralDePagarEnPartes`): se compara el total más alto que salió en esa cotización (efectivo, o tarjeta si fue lo que pidió, y con factura si la pidió).
+- **Envíos** (solo para el motivo del grupo, nunca se lo dice al cliente): Neuquén capital $35.000, cualquier otro lugar $45.000, por pedido. Antes del 17/11 la nota de Fran decía $30.000 / $40.000: manda la de hoy.
+
+**Decisiones que tomé solo (revisar)**
+
+1. **Sin forma de pago, `cotizar` devuelve SOLO el total en efectivo o transferencia; la tarjeta solo si el cliente la pregunta.** Es la lectura de "se pasa solo el precio de efectivo/transferencia" y "pasa el precio con tarjeta si lo piden". Antes salían los dos totales. Si se quiere volver a los dos, es una línea en `herramientas-erasmo.js` (`const columnas = …`) y el formato de las reglas.
+2. **"Responder y escalar" en el mismo turno no existe** (Sonnet termina con una u otra; al escalar al cliente solo le llega "Enseguida te respondemos."). Por eso, para dos cosas de la nota de Fran, Erasmo **solo escala** y no dice la frase: **cuotas en compra de más de $1.000.000** ("Cuotas no tenemos, pero en compras grandes se puede ver pagar en partes") y **dólares** ("dice que sí y escala para el número"). Si se quiere que las diga antes de pasar el chat, hay que cambiar el diseño de `escalar` (decisión de Tomás; ver "Pendientes de decisión" en `CLAUDE.md`).
+3. **Mercado Pago y QR salieron de las formas de pago de `cotizar`** (antes `mercado_pago` y `qr` cotizaban como efectivo): si el cliente dice que paga así, `cotizar` devuelve error y Erasmo escala. El mapa interno del cotizador (`cotizador-piedra.js`) no se tocó, solo el comentario.
+4. **Un producto del panel sin precio de tarjeta** ya se cotiza en efectivo (antes, sin forma de pago, daba FALTA DATO para todo el pedido); con tarjeta sigue dando FALTA DATO y escala.
+5. **Pago mixto**: se cotiza con efectivo y puede decirse que se acepta (la forma `mixto` da error con la indicación de cotizar con efectivo).
+6. **Color sin stock**: solo vale para la granza (los 3 colores). `#sinstock` / `#hay` aceptan varios colores ("roja y blanca", "gris tandil", "blanca mdp"…); lo que no entienden no cambia nada y contesta ❓. El estado vive en `estado.json` (clave interna), vale para todos los chats y arranca todo en stock. `buscar_productos` marca el color con `hay_stock: false` (no lo saca, para que Sonnet no diga "no lo trabajamos") y `cotizar` de ese color da error. **Lo que no se puede forzar por código**: que Sonnet no lo mencione; eso lo dicen el pedido ("hoy NO hay stock de…") y las reglas.
+7. **Envíos**: Sonnet elige "capital" u "otro lugar" por la localidad; el motivo con los montos no pasa por la guardia (solo se revisa lo que sale al cliente), y si Sonnet los escribiera al cliente la guardia lo frena. Siguen escalando siempre.
+8. Las reglas ya no dicen "no se vende por bolsón"; el ejemplo de la objeción de precio ahora dice "un bolsón son 20 bolsas de 40 kg".
+
+**Tests**: `granza` (tabla y bolsón), `erasmo-herramientas` (medios de pago, sin IVA ofrecido, bolsón, sin stock, compra grande), `stock-colores` (nuevo), `erasmo-fran-1117` (nuevo: el pedido con stock y cuotas) y 10 casos nuevos en `evaluar` (con Sonnet enlatado: prueban el circuito y las cuentas, **no el criterio de Sonnet**; eso se ve con el tester). Verificado con mutaciones: sacar el freno de color sin stock, o cambiar `>` por `>=` en el millón, hace fallar los tests.
