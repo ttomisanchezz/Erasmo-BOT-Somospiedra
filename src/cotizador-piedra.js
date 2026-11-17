@@ -5,7 +5,8 @@
  *
  * Reglas (Tomas, 16/10/2026; cambiadas el 30/10 y el 02/11, y confirmadas el 09/11/2026):
  *  - Cada producto tiene dos precios: EFECTIVO y PRECIO LISTA (por unidad de venta).
- *  - EFECTIVO: efectivo, transferencia, Mercado Pago y QR. LISTA: tarjeta (un solo pago), cheque y postnet.
+ *  - EFECTIVO: efectivo o transferencia (Fran y Tomás, 17/11/2026: Mercado Pago y QR ya no se ofrecen; el mapa `MEDIOS` los sigue
+ *    entendiendo). LISTA: tarjeta (un solo pago), cheque y postnet.
  *  - Sin factura se cobra ese precio. CON FACTURA se suma el 21 % de IVA al precio que sea, efectivo O lista
  *    (decision del 30/10: manda lo que dijo Fran; la regla del 16/10, "la lista ya es final", quedo vieja).
  *  - Redondeo (02/11): SIEMPRE para abajo, a la centena de pesos (10.550 -> 10.500), en cada total que se muestra.

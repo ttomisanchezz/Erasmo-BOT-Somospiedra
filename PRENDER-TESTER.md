@@ -59,9 +59,15 @@ Tiene que pasar:
 Desde el celular del tester (299 429-5806), escribile al WhatsApp de Somos Piedra como si fueras un cliente (tiene que ser **otro** celular que el del negocio). Cosas para probar:
 
 - "Hola, qué piedras tienen?" → te contesta y manda el catálogo en PDF después de los mensajes.
-- "Cuánto sale la granza roja para 12 m2?" → los dos totales, sin factura.
-- "Y con factura?" → los totales con el 21 % (también en tarjeta).
+- "Cuánto sale la granza roja para 12 m2?" → solo el total en efectivo o transferencia ($240.000), sin ofrecer factura ni IVA.
+- "Y con tarjeta?" → $300.000 (un solo pago).
+- "Dale, con tarjeta" → escala ("¿ya está el posnet?"): al cliente solo "Enseguida te respondemos.".
+- "Y con factura?" → el total con el 21 %.
+- "Cuánto sale 1 bolsón de granza gris?" → $310.000 (1 bolsón = 20 bolsas).
+- "Cuánto salen 5 bolsones de granza roja?" y después "Se puede pagar en cuotas?" → escala con "pide pagar en partes, compra de $1.550.000".
+- En el grupo `#sinstock roja` y después pedir granza roja → no la cotiza y ofrece las otras. **Al terminar, `#hay roja`** (y `#sinstock` solo, para ver que no falte nada): queda guardado en `estado.json` y sobrevive al reinicio.
 - "Adoquines ojito 10 m2, pago en efectivo" → un solo total.
+- "Hacen envíos?" → te pregunta la localidad. Después "Plottier" → en el grupo el motivo trae "sugerido $45.000" (Neuquén capital: $35.000).
 - "Hacen envíos a Plottier?" → al cliente le llega solo "Enseguida te respondemos." (una vez, a cualquier hora; lo que escriba después ya no se contesta); al grupo llega el aviso (de 9 a 20; afuera de ese horario se junta y sale a las 9).
 - "Lo pienso, en 15 días arranco la obra" → "Dale, no hay problema"; el equipo recibe el aviso ese día a las 9.
 - `#reset` (desde el celular del tester) → arranca el chat de cero.

@@ -165,8 +165,9 @@ Cómo prenderlo: `PRENDER-TESTER.md`. Qué revisar (cuentas y decisiones de plat
   pedido a Sonnet dice "hoy NO hay stock de…" (no lo ofrece ni lo menciona; si el cliente lo pide, le dice que hoy no hay
   y ofrece los otros). Solo granza. Tests: `test/stock-colores.test.js`, `erasmo-herramientas`, `erasmo-fran-1117`.
 - `src/herramientas-erasmo.js`: `buscar_productos` (nombres exactos, sin precios), `cotizar` (producto exacto + m² /
-  largo y ancho / cantidad, forma de pago, con o sin factura → los totales ya escritos; tarjeta un solo pago; sin
-  cuotas, cheque, pago mixto ni dólares; más de 100 m² escala; la multiplicación de largo × ancho la hace el
+  largo y ancho / cantidad / bolsones (solo granza), forma de pago, con o sin factura → los totales ya escritos; sin
+  forma de pago, solo el total en efectivo o transferencia (la tarjeta, un solo pago, si el cliente la pide); sin
+  cuotas, cheque ni dólares (el pago mixto se cotiza con efectivo); un color sin stock no se cotiza; avisa `compra_grande` sobre $1.000.000; más de 100 m² escala; la multiplicación de largo × ancho la hace el
   código), `mandar_catalogo` y `agendar_seguimiento`. **Las dos últimas no hacen nada en el acto**: anotan en
   `turno.acciones` y `index.js` las ejecuta DESPUÉS de mandar los textos (y solo si el turno no escaló).
 - **Catálogo PDF** (`mandar_catalogo`): `documentos/Catalogo-Somos-Piedra-2026_3.pdf` (carpeta fuera de git), por
@@ -282,7 +283,7 @@ escribe mal (no hay un `#ayuda` central: cada módulo tiene su `COMO_SE_USA`).
 
 **npm**: `npm start`; `npm test` (la suite: ver `package.json`; si tarda, archivo por archivo con
 `node test/<archivo>.test.js`); `npm run grupos` (ids de los grupos de la instancia); `npm run pruebas -- 549…`
-(la charla del tester en `data/pruebas/`); `npm run evaluar -- --offline` (18 casos de Piedra con Sonnet enlatado: tiene
+(la charla del tester en `data/pruebas/`); `npm run evaluar -- --offline` (28 casos de Piedra con Sonnet enlatado: tiene
 que dar 100%); `npm run aprender`; `npm run destino` (a dónde van los avisos); `npm run sembrar-viejos`
 (semilla de chats viejos, con el bot frenado); `npm run probar-contexto -- 549…`.
 

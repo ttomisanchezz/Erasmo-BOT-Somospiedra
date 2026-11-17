@@ -3,7 +3,7 @@
  * Cotizador de Somos Piedra: dos precios por producto (EFECTIVO y PRECIO LISTA).
  * Productos y precios INVENTADOS: ningun precio real de Piedra va en los tests.
  * Decisiones de Tomas (16/10/2026, cambiadas el 30/10 y el 02/11; confirmadas el 09/11/2026):
- *  - EFECTIVO: efectivo, transferencia, Mercado Pago y QR. LISTA: tarjeta, cheque y postnet.
+ *  - EFECTIVO: efectivo o transferencia (el mapa interno sigue entendiendo Mercado Pago y QR). LISTA: tarjeta, cheque y postnet.
  *  - CON FACTURA se suma el 21 % de IVA al precio que sea, efectivo O lista (30/10).
  *  - Redondeo siempre para abajo a la centena de pesos, en cada total (02/11).
  *  - Si no dicen como pagan, el bot dice el de efectivo (y aclara que con tarjeta es otro).
