@@ -422,7 +422,78 @@ const AGENDAR_SEGUIMIENTO = {
 };
 
 /** Las herramientas de datos, en el orden en que van a la API. */
-const HERRAMIENTAS = [BUSCAR_PRODUCTOS, COTIZAR, MANDAR_CATALOGO, AGENDAR_SEGUIMIENTO];
+
+// ---------------------------------------------------------------------------
+// cotizar_envio (Tomás, 17/11/2026, opción A: Erasmo dice el costo del envío él mismo)
+// ---------------------------------------------------------------------------
+
+/**
+ * Costo del envío por pedido (Fran, 17/11/2026), en centavos: Neuquén capital $35.000; el Alto Valle cercano $45.000.
+ * Una localidad que no está en las listas escala (con el motivo de antes): que Erasmo no le diga $45.000 a Bariloche.
+ */
+const ENVIO_CAPITAL_CENTAVOS = 3500000;
+const ENVIO_CERCA_CENTAVOS = 4500000;
+const normalLocalidad = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+const LOCALIDADES_CAPITAL = ['neuquen', 'neuquen capital', 'nqn', 'nqn capital', 'capital', 'neuquen ciudad', 'ciudad de neuquen'];
+const LOCALIDADES_CERCA = [
+  'plottier', 'centenario', 'cipolletti', 'cipo', 'senillosa', 'vista alegre', 'vista alegre norte', 'vista alegre sur',
+  'cinco saltos', 'fernandez oro', 'allen', 'balsa las perlas', 'las perlas', 'contralmirante cordero', 'barda del medio',
+];
+
+/** La zona de una localidad: 'capital', 'cerca' o null (no la conocemos: escala). */
+function zonaDeEnvio(localidad) {
+  const l = normalLocalidad(localidad).replace(/^(en|a|para) /, '');
+  if (!l) return null;
+  if (LOCALIDADES_CAPITAL.includes(l)) return 'capital';
+  if (LOCALIDADES_CERCA.includes(l)) return 'cerca';
+  return null;
+}
+
+const COTIZAR_ENVIO = {
+  definicion: {
+    name: 'cotizar_envio',
+    description:
+      'El costo del envío a una localidad (por pedido, con transporte propio). Llamala cuando el cliente pide envío o pregunta ' +
+      'si llegan a su localidad, con la localidad que dijo. Si ya se cotizó algo en el chat, devuelve también el total con el ' +
+      'envío. Si la localidad no está en la zona de reparto, devuelve error: escalá.',
+    input_schema: objeto({ localidad: { type: 'string', description: 'La localidad tal cual la dijo el cliente (por ejemplo "Plottier").' } }, ['localidad']),
+  },
+  async correr(input, turno) {
+    const i = input || {};
+    const zona = zonaDeEnvio(i.localidad);
+    if (!zona) {
+      return {
+        error:
+        'Esa localidad no está en la zona de reparto que conozco: escalá con el motivo "pide envío a [localidad], [producto] ' +
+          '[cantidad] → sugerido $45.000" (el monto es solo para el grupo: no se lo digas al cliente).',
+      };
+    }
+    const envioCentavos = zona === 'capital' ? ENVIO_CAPITAL_CENTAVOS : ENVIO_CERCA_CENTAVOS;
+    turno.montos.push(pesosEnteros(envioCentavos));
+    const out = { ok: true, localidad: String(i.localidad).trim(), envio: cotizador.formatearPesos(envioCentavos) };
+    // Lo último cotizado: el de este turno o el de la ficha del chat.
+    let previo = turno.cotizo;
+    if (!previo && turno.chatId) {
+      const s = state.obtener(turno.chatId) || {};
+      previo = s.ficha && s.ficha.pidio;
+    }
+    if (previo && Number.isFinite(Number(previo.totalCentavos)) && Number(previo.totalCentavos) > 0) {
+      const total = Number(previo.totalCentavos) + envioCentavos;
+      turno.montos.push(pesosEnteros(total));
+      out.total_con_envio = cotizador.formatearPesos(total);
+      out.total_de =
+        `${previo.producto} ${previo.cantidad} ${previo.unidad}` +
+        ` · ${previo.pago === 'tarjeta' ? 'tarjeta, un pago' : 'efectivo o transferencia'}${previo.factura ? ' · con factura' : ''} + envío`;
+    }
+    out.aviso =
+      'Decí que sí llegan y cuánto es el envío' +
+      (out.total_con_envio ? ' y el total con el envío (aclarando la forma de pago)' : '') +
+      '. La fecha no la prometés: es orientativa (2 o 3 días después de coordinar). No sumes nada vos.';
+    return out;
+  },
+};
+
+const HERRAMIENTAS = [BUSCAR_PRODUCTOS, COTIZAR, COTIZAR_ENVIO, MANDAR_CATALOGO, AGENDAR_SEGUIMIENTO];
 
 module.exports = {
   HERRAMIENTAS,
@@ -433,4 +504,5 @@ module.exports = {
   M2_MAXIMO,
   CATALOGO_HORAS,
   SEGUIMIENTO_MAX_DIAS,
+  zonaDeEnvio,
 };

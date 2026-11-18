@@ -97,7 +97,7 @@ const nuevo = () => `54900000${String(++n).padStart(5, '0')}`;
     sonnet.guion(sonnet.escala('pregunta precio'));
     await bot.procesar(mensaje(num, 'hola, cuanto sale la piedra bola?'));
     const body = sonnet.pedidos[0].body;
-    assert.deepStrictEqual(body.tools.map((t) => t.name).sort(), ['agendar_seguimiento', 'buscar_productos', 'cotizar', 'escalar', 'mandar_catalogo', 'responder']);
+    assert.deepStrictEqual(body.tools.map((t) => t.name).sort(), ['agendar_seguimiento', 'buscar_productos', 'cotizar', 'cotizar_envio', 'escalar', 'mandar_catalogo', 'responder']);
     assert.match(body.system[0].text, /Somos Piedra/);
     assert.ok(!/iphone|chiara|canje|bater|techsur|icloud/i.test(body.system[0].text), 'las reglas traen algo de iPhone');
     const texto = sonnet.textoDelPedido(0);

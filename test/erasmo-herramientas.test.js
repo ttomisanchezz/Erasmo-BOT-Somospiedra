@@ -351,7 +351,7 @@ const totalesDe = (r) => r.totales.map((t) => t.total);
 
   console.log('\nlas definiciones');
   await check('van a la API con nombre, descripción y schema; ninguna promete nada en la descripción al cliente', async () => {
-    assert.deepStrictEqual(herr.HERRAMIENTAS.map((h) => h.definicion.name), ['buscar_productos', 'cotizar', 'mandar_catalogo', 'agendar_seguimiento']);
+    assert.deepStrictEqual(herr.HERRAMIENTAS.map((h) => h.definicion.name), ['buscar_productos', 'cotizar', 'cotizar_envio', 'mandar_catalogo', 'agendar_seguimiento']);
     for (const h of herr.HERRAMIENTAS) {
       assert.ok(h.definicion.description.length > 40);
       assert.strictEqual(h.definicion.input_schema.type, 'object');
