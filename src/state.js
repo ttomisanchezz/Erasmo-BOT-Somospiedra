@@ -769,6 +769,41 @@ function guardarSinStockColores(lista) {
 }
 
 /**
+ * Las tandas de chats sin contestar (src/tandas.js, 18/11/2026) bajo la clave interna:
+ * `{ siguiente, actual: { id, estado, creada }, chats: { chatId: { tanda, ts, resultado } } }`. `chats` son los chats
+ * que una tanda YA MANDADA atendió (con respuesta, escalado o "no contestar"): no vuelven a una tanda. Sobrevive a un
+ * reinicio y #reset no lo toca. Quien lo cambia llama a `guardarInternoYa`.
+ */
+function datosDeTandas() {
+  const i = interno();
+  const t = i.tandas;
+  if (!t || typeof t !== 'object' || Array.isArray(t)) i.tandas = { siguiente: 1, actual: null, chats: {} };
+  if (!i.tandas.chats || typeof i.tandas.chats !== 'object' || Array.isArray(i.tandas.chats)) i.tandas.chats = {};
+  if (!Number.isInteger(i.tandas.siguiente) || i.tandas.siguiente < 1) i.tandas.siguiente = 1;
+  return i.tandas;
+}
+
+/**
+ * La reactivación de Piedra (src/reactivacion.js, 18/11/2026) bajo la clave interna:
+ * `{ chats: { chatId: { m1, m2, descartado, cortado } }, dias: { 'AAAA-MM-DD': cantidad } }`. Las marcas de cada chat
+ * (cuándo salió el mensaje 1 y el 2, si Sonnet lo descartó, si el cliente contestó) viven acá y no dentro del chat a
+ * propósito: #reset borra el chat y con él se perdería la cuenta, y "nunca más de 2 por chat" tiene que valer siempre.
+ */
+function datosDeReactivacion() {
+  const i = interno();
+  const r = i.reactivacion;
+  if (!r || typeof r !== 'object' || Array.isArray(r)) i.reactivacion = { chats: {}, dias: {} };
+  if (!i.reactivacion.chats || typeof i.reactivacion.chats !== 'object' || Array.isArray(i.reactivacion.chats)) i.reactivacion.chats = {};
+  if (!i.reactivacion.dias || typeof i.reactivacion.dias !== 'object' || Array.isArray(i.reactivacion.dias)) i.reactivacion.dias = {};
+  return i.reactivacion;
+}
+
+/** Guarda ya lo que se cambió en `datosDeTandas` / `datosDeReactivacion`: son decisiones y cuentas que no se pueden perder con un corte. */
+function guardarInternoYa() {
+  guardarYa();
+}
+
+/**
  * El gasto de Sonnet del mes (bloque Ninjo 2, 06/10/2026): `{ mes: 'AAAA-MM', usd }`, el mes de
  * Argentina. Lo suma cerebro.js con cada llamada a la API (`sumarAlMes`), en el mismo lugar que el
  * gasto del día; /salud lo muestra. Bajo la clave interna: sobrevive a un reinicio y #reset no lo toca.
@@ -892,5 +927,8 @@ module.exports = {
   generados,
   guardarGenerado,
   borrarGenerados,
+  datosDeTandas,
+  datosDeReactivacion,
+  guardarInternoYa,
   ARCHIVO,
 };

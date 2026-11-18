@@ -149,7 +149,7 @@ function mismaLinea(h, l) {
  * sola de Evolution. Lo del último minuto antes de la línea más nueva del historial (o de `ahora`,
  * si está vacío), o posterior, no entra: está llegando por el webhook.
  */
-function nuevasLineas(historial, lineas, { ahora = Date.now() } = {}) {
+function nuevasLineas(historial, lineas, { ahora = Date.now(), sinLimite = false } = {}) {
   const h = historial || [];
   const masNueva = h.reduce((max, l) => Math.max(max, Number(l && l.ts) || 0), 0) || ahora;
   const limite = masNueva - EN_CAMINO_MS;
@@ -157,7 +157,8 @@ function nuevasLineas(historial, lineas, { ahora = Date.now() } = {}) {
   const usadas = new Set();
   const out = [];
   for (const l of lineas) {
-    if (l.ts > limite) continue;
+    // `sinLimite` (lectura-larga.js, que no escribe en el estado): nada la va a duplicar, entra todo.
+    if (!sinLimite && l.ts > limite) continue;
     if (l.id && ids.has(l.id)) continue;
     const igual = h.find((x) => x && !x.id && !usadas.has(x) && mismaLinea(x, l));
     if (igual) {

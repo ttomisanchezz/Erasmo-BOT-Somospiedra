@@ -54,6 +54,11 @@ const interruptor = require('./interruptor');
 const documentos = require('./documentos');
 const seguimiento = require('./seguimiento');
 const avisosCola = require('./avisos-cola');
+// Tandas de chats sin contestar (#tanda) y reactivación de 2 mensajes (18/11/2026): src/tandas.js, src/reactivacion.js.
+const tandas = require('./tandas');
+const reactivacion = require('./reactivacion');
+const lectura = require('./lectura-larga');
+const { motivoQueNoCuenta } = require('./chats-elegibles');
 // Acuses y agradecimientos: el barrido del silencio y #sigue no contestan solo eso.
 const { esCierre } = require('./cierre');
 
@@ -452,6 +457,12 @@ async function comandoDelGrupo(data) {
   // #sonnet, #comparar, #bot y #sonnet-si, con el número.
   const son = cerebroComandos.comando(texto);
   if (son) await confirmarComandoSonnet(son, await cerebroComandos.desdeGrupo(son));
+  // #tanda / #tanda-ok / #tanda-no: los chats sin contestar, de a 40 y con tu OK (src/tandas.js).
+  const tan = tandas.comando(texto);
+  if (tan) await comandoDeTandas(tan);
+  // #reactivar / #reactivar-prueba: la reactivación de 2 mensajes (src/reactivacion.js).
+  const rea = reactivacion.comando(texto);
+  if (rea) await comandoDeReactivacion(rea);
   // #apagar / #prender: el interruptor general.
   const inter = interruptor.comando(texto);
   if (inter) await confirmarInterruptor(interruptor.desdeGrupo(inter));
@@ -1341,6 +1352,229 @@ async function atenderTanda(chatId, nombre, cola, { cortarPorMensajeNuevo = true
 }
 
 // ---------------------------------------------------------------------------
+// Tandas de chats sin contestar y reactivación (18/11/2026): src/tandas.js y src/reactivacion.js
+// ---------------------------------------------------------------------------
+// Los dos mandan mensajes a clientes que NO acaban de escribir, así que van con todos los candados juntos y cada
+// uno vuelve a mirarse justo antes de CADA envío. Nada de esto sale sin la orden de Tomás en el grupo (#tanda-ok) o sin
+// ERASMO_REACTIVACION_ACTIVA=true.
+
+/**
+ * Por qué NO se puede mandar nada ahora (las tandas y la reactivación), o null: apagado con #apagar, escucha,
+ * borrador, o un CEREBRO_MODO que no manda (con `apagado`, `sombra` y `tester` nadie le escribe a un cliente viejo).
+ */
+function frenoGeneralDeEnvio() {
+  if (!interruptor.prendida()) return 'el bot está apagado (#apagar)';
+  if (config.modoEscucha) return 'MODO_ESCUCHA: no sale nada';
+  if (config.modoBorrador) return 'MODO_BORRADOR: al cliente no le llega nada';
+  if (!tandas.MODOS_QUE_MANDAN.includes(config.cerebro.modo)) return `CEREBRO_MODO=${config.cerebro.modo}: solo con nuevos o todos se le escribe a un cliente`;
+  return null;
+}
+
+/**
+ * Por qué NO se le manda ahora a ESTE chat, o null. Los candados de siempre (excluido, pausado, escalado, una persona
+ * de la cuenta, #bot, #vendido / #perdido, tester) más `leLlegaAlCliente` (las listas de prueba y SOLO_CHATS_NUEVOS: un
+ * chat viejo no recibe con SOLO_CHATS_NUEVOS=true) y que no tenga una tanda en curso (si el cliente escribió, ya lo
+ * está atendiendo el flujo de siempre). Se mira antes y otra vez justo antes de cada envío. No lee la red.
+ */
+function frenoDeChatMasivo(chatId) {
+  if (evolution.esContactoPersonal(chatId)) return MOTIVO_EXCLUIDO;
+  const s = state.todos()[chatId];
+  if (!s) return 'el chat ya no existe (¿#reset?)';
+  const noCuenta = motivoQueNoCuenta(chatId, s);
+  if (noCuenta) return noCuenta;
+  if (state.humanoActivo(chatId, config.silencioTrasHumanoMin)) return 'escribió alguien de la cuenta hace poco';
+  if (!evolution.leLlegaAlCliente(chatId)) return `no le llegaría: ${porQueNoLeLlega()}`;
+  if (enProceso.has(chatId) || (pendientes.get(chatId) || []).length) return 'tiene una tanda en curso (escribió el cliente)';
+  return null;
+}
+
+/**
+ * ¿Cambió el chat desde que se armó la propuesta? Lo relee de Evolution (solo lectura) y compara su último mensaje con
+ * el que se leyó: si es otro, escribió el cliente o una persona de la cuenta y a este chat no se le manda. Sin poder
+ * verificarlo, tampoco: ante la duda, no se le escribe. Devuelve el motivo o null.
+ */
+async function cambioEnElChat(chatId, esperada) {
+  const lec = await lectura.leerLargo(chatId, { cuantos: 10 });
+  if (!lec.evolution) return `no pude verificar el chat (${lec.error})`;
+  const u = lec.lineas[lec.lineas.length - 1];
+  if (!u) return 'el chat quedó vacío';
+  const igual = esperada.id && u.id ? String(u.id) === String(esperada.id) : Number(u.ts) === Number(esperada.ts);
+  if (u.quien === esperada.quien && igual) return null;
+  return u.quien === 'cliente' ? 'el cliente escribió de nuevo desde que se armó la propuesta' : 'una persona de la cuenta escribió desde que se armó la propuesta';
+}
+
+/** ¿El cliente escribió algo después de `ts`? (lo que ya sabe el estado) */
+const clienteEscribioDespues = (chatId, ts) => ((state.todos()[chatId] || {}).historial || []).some((l) => l && l.quien === 'cliente' && Number(l.ts) > Number(ts));
+
+/**
+ * Manda UN chat de una tanda ya aprobada con #tanda-ok (lo llama tandas.js). `item.accion` es 'responder' o 'escalar'.
+ * Devuelve { resultado: 'enviado' | 'escalado' | 'salteado', motivo }. Antes de nada: los candados (`frenoDeChatMasivo`) y
+ * que el último mensaje del chat siga siendo el que se leyó (`cambioEnElChat`). Después, el mismo camino que una
+ * respuesta de siempre: lo ya dicho se saca (`cerebro.comoResultado`), "escribiendo…", la espera del ritmo, el control
+ * antes de CADA mensaje, `enviarAlCliente` (origen 'tanda'), el catálogo y el seguimiento si los pidió. El chat queda con
+ * `atiendeSonnet: true`. Un escalado sale como uno normal (`escalarEnSilencio`: el 🔕 al grupo y, solo si el chat se
+ * calla, "Enseguida te respondemos."). Un #reset en el medio corta este chat.
+ */
+async function mandarChatDeTanda(item, tandaId) {
+  const chatId = item.chatId;
+  const donde = { origen: 'tanda', tanda: `T${tandaId}` };
+  try {
+    return await tandaEnCurso.run({ chatId, generacion: state.generacion(chatId) }, async () => {
+      const freno = frenoDeChatMasivo(chatId) || (await cambioEnElChat(chatId, item.ultimaLinea));
+      if (freno) return { resultado: 'salteado', motivo: freno };
+      const nombre = state.obtener(chatId).nombre || item.nombre || '';
+      const sonnet = { modelo: config.cerebro.modelo, reglas: cerebro.REGLAS_HASH, usd: item.usd || 0, herramientas: item.herramientas || [] };
+
+      if (item.accion === 'escalar') {
+        cerebro.comoResultado(chatId, { escalar: true, motivo: item.motivo, mensajes: [] }, { nombre });
+        aprendizaje.propuesta(chatId, { tanda: donde.tanda, lineas: [], mensajes: [], escalar: true, motivo: item.motivo, contexto: { humanoAtendiendo: false, audio: false }, modo: 'vivo', origen: 'tanda', fuente: 'sonnet', sonnet });
+        await escalarEnSilencio({ chatId, nombre, motivo: item.motivo, ctx: state.obtener(chatId), calla: true, tanda: donde.tanda });
+        return control.callado(state.obtener(chatId)) ? { resultado: 'escalado' } : { resultado: 'salteado', motivo: 'el aviso al grupo no salió o ese motivo ya se había avisado' };
+      }
+
+      // Lo que ya se le dijo se saca otra vez (la propuesta es de hace un rato) y se anota la ficha, como en vivo.
+      const r = cerebro.comoResultado(chatId, { mensajes: item.mensajes, escalar: false, acciones: item.acciones || {}, cotizo: item.cotizo || null }, { nombre });
+      if (r.escalar || !r.mensajes.length) return { resultado: 'salteado', motivo: 'lo que iba a decir ya se lo había dicho' };
+      const mensajes = r.mensajes.slice(0, config.ritmo.maxMensajesPorTanda);
+      aprendizaje.propuesta(chatId, { tanda: donde.tanda, lineas: [], mensajes: mensajes.map(acciones.comoTexto), escalar: false, motivo: '', contexto: { humanoAtendiendo: false, audio: false }, modo: 'vivo', origen: 'tanda', fuente: 'sonnet', sonnet });
+      state.actualizar(chatId, {
+        ultimaPropuestaBot: mensajes.map(acciones.comoTexto).join(' | '),
+        ...(!state.obtener(chatId).botPropuso ? { botPropuso: Date.now() } : {}),
+      });
+      let enviados = 0;
+      let corte = null;
+      for (const m of mensajes) {
+        await evolution.mostrarEscribiendo(chatId, config.ritmo.entreMensajesMs);
+        await dormir(config.ritmo.entreMensajesMs);
+        state.comprobarVigente(chatId);
+        corte = frenoDeChatMasivo(chatId) || (clienteEscribioDespues(chatId, item.ultimaLinea.ts) ? 'el cliente escribió en el medio' : null);
+        if (corte) break;
+        const t = acciones.comoTexto(m);
+        const enviado = await enviarAlCliente(chatId, 'texto', t, () => evolution.enviarTexto(chatId, t, 0), acciones.marcasDe(m), donde);
+        anotarEnvio(chatId, enviado);
+        if (autoria.llego(enviado)) {
+          enviados++;
+          if (enviados === 1) state.actualizar(chatId, { atiendeSonnet: true, atiendeSonnetDesde: Date.now() });
+        }
+        state.agregarAlHistorial(chatId, 'vendedor', t, autoria.llego(enviado) ? { id: enviado.key.id } : { sinConfirmar: true });
+        state.actualizar(chatId, { ultimoBot: Date.now() });
+      }
+      if (!enviados) return { resultado: 'salteado', motivo: corte || 'no salió ningún mensaje' };
+      const acc = r.acciones || {};
+      const catalogoSalio = acc.catalogo && !corte ? await mandarCatalogo(chatId, new Set(), false, donde) : false;
+      if (acc.seguimiento && (enviados || catalogoSalio)) {
+        seguimiento.anotar(chatId, acc.seguimiento);
+        console.log(`[seguimiento] ${chatId}: volver a contactar el ${acc.seguimiento.fecha}`);
+      }
+      console.log(`[tanda] ${chatId}: salieron ${enviados} de ${mensajes.length} mensaje(s)${corte ? ` (se cortó: ${corte})` : ''}`);
+      return { resultado: 'enviado', ...(corte ? { motivo: `salieron ${enviados} de ${mensajes.length}: ${corte}` } : {}) };
+    });
+  } catch (e) {
+    if (e instanceof state.ChatReiniciado) return { resultado: 'salteado', motivo: 'se hizo #reset mientras se mandaba' };
+    throw e;
+  }
+}
+
+/**
+ * Manda UN mensaje de la reactivación (lo llama reactivacion.js). Los candados de siempre, "escribiendo…", la espera del
+ * ritmo, y otra vez los candados justo antes de mandar. El texto lo escribió el código (reactivacion-textos.js). Si sale
+ * queda en el historial y el chat con `atiendeSonnet: true`. Devuelve { salio, motivo }.
+ */
+async function mandarReactivacion(chatId, texto, cand) {
+  try {
+    return await tandaEnCurso.run({ chatId, generacion: state.generacion(chatId) }, async () => {
+      const antes = frenoDeChatMasivo(chatId) || (clienteEscribioDespues(chatId, cand.ultimaCuenta.ts) ? 'el cliente escribió' : null);
+      if (antes) return { salio: false, motivo: antes };
+      await evolution.mostrarEscribiendo(chatId, config.ritmo.entreMensajesMs);
+      await dormir(config.ritmo.entreMensajesMs);
+      state.comprobarVigente(chatId);
+      const justo = frenoGeneralDeEnvio() || frenoDeChatMasivo(chatId) || (clienteEscribioDespues(chatId, cand.ultimaCuenta.ts) ? 'el cliente escribió' : null);
+      if (justo) return { salio: false, motivo: justo };
+      const enviado = await enviarAlCliente(chatId, 'texto', texto, () => evolution.enviarTexto(chatId, texto, 0), null, { origen: 'reactivacion', tanda: null });
+      anotarEnvio(chatId, enviado);
+      if (!autoria.llego(enviado)) return { salio: false, motivo: (enviado && enviado.motivo) || 'Evolution no lo confirmó' };
+      state.agregarAlHistorial(chatId, 'vendedor', texto, { id: enviado.key.id });
+      state.actualizar(chatId, { ultimoBot: Date.now(), atiendeSonnet: true, atiendeSonnetDesde: Date.now() });
+      return { salio: true };
+    });
+  } catch (e) {
+    if (e instanceof state.ChatReiniciado) return { salio: false, motivo: 'se hizo #reset mientras se mandaba' };
+    throw e;
+  }
+}
+
+/** El barrido de la reactivación (cada 15 minutos). Sin ERASMO_REACTIVACION_ACTIVA=true no hace nada. */
+function revisarReactivacion(ahora = Date.now()) {
+  return reactivacion.revisar({
+    ahora,
+    frenoGeneral: frenoGeneralDeEnvio,
+    frenoDeChat: frenoDeChatMasivo,
+    enviar: mandarReactivacion,
+    esperar: () => dormir(esperaAleatoria()),
+  });
+}
+
+setInterval(() => revisarReactivacion().catch((e) => console.error('[reactivacion] el barrido falló:', e.message)), 15 * 60 * 1000);
+// Una tanda que quedó armándose o mandándose cuando el bot se reinició no sigue sola: queda 'interrumpida'.
+tandas.alArrancar();
+
+// Lo largo (armar una tanda, mandarla, la prueba de la reactivación) corre en segundo plano: el comando contesta ya.
+const enSegundoPlano = new Set();
+function enBackground(promesa) {
+  enSegundoPlano.add(promesa);
+  promesa.finally(() => enSegundoPlano.delete(promesa));
+}
+/** Para las pruebas: espera a que termine todo lo que corre en segundo plano. */
+async function esperarSegundoPlano() {
+  while (enSegundoPlano.size) await Promise.all([...enSegundoPlano]);
+}
+
+const alGrupo = (texto) => evolution.avisarGrupo(texto, { inmediato: true }).catch((e) => console.error('[grupo] no pude contestar:', e.message));
+
+/** #tanda, #tanda-ok y #tanda-no, escritos por la cuenta en el grupo interno. */
+async function comandoDeTandas(cmd) {
+  if (cmd.problema) {
+    await alGrupo(`❓ ${cmd.problema}. No hice nada.\n\n${tandas.COMO_SE_USA}`);
+    return;
+  }
+  if (cmd.tipo === 'tanda') {
+    enBackground(
+      tandas
+        .armar({ frenoGeneral: frenoGeneralDeEnvio, salenAlCliente: (id) => !frenoDeChatMasivo(id), alEmpezar: alGrupo })
+        .then((r) => alGrupo(r.aviso))
+        .catch((e) => console.error('[tandas] no pude armar:', e.message))
+    );
+    return;
+  }
+  if (cmd.tipo === 'tanda-no') {
+    await alGrupo(tandas.descartar({ id: cmd.id }).aviso);
+    return;
+  }
+  const r = tandas.ok({ id: cmd.id, omitir: cmd.omitir, frenoGeneral: frenoGeneralDeEnvio, mandarChat: mandarChatDeTanda, esperar: () => dormir(esperaAleatoria()) });
+  await alGrupo(r.aviso);
+  if (r.trabajo) enBackground(r.trabajo.then(alGrupo).catch((e) => console.error('[tandas] la tanda falló:', e.message)));
+}
+
+/** #reactivar y #reactivar-prueba, escritos por la cuenta en el grupo interno. */
+async function comandoDeReactivacion(cmd) {
+  if (cmd.problema) {
+    await alGrupo(`❓ ${cmd.problema}. No hice nada.\n\n${reactivacion.COMO_SE_USA}`);
+    return;
+  }
+  if (cmd.tipo === 'reactivar') {
+    await alGrupo(reactivacion.estado({ frenoGeneral: frenoGeneralDeEnvio }));
+    return;
+  }
+  await alGrupo('Armo la prueba de la reactivación: miro a quién le saldría hoy y le pregunto a Sonnet por cada uno. No mando nada.');
+  enBackground(
+    reactivacion
+      .armarPrueba({ frenoDeChat: frenoDeChatMasivo, frenoGeneral: frenoGeneralDeEnvio })
+      .then((r) => alGrupo(r.aviso))
+      .catch((e) => console.error('[reactivacion] no pude armar la prueba:', e.message))
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Webhook (auditoría del 15/09/2026, A1)
 // ---------------------------------------------------------------------------
 // El webhook ordena mandar mensajes por el WhatsApp del negocio: no se le cree a cualquiera. En orden, lo
@@ -1980,6 +2214,8 @@ module.exports = {
   reiniciarTopeWebhook,
   procesar,
   revisarSilencios,
+  revisarReactivacion,
+  esperarSegundoPlano,
   revisarRecordatorios,
   revisarEscalados,
   revisarGuardian,

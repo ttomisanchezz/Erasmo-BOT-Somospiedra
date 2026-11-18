@@ -11,6 +11,12 @@ function opt(nombre, porDefecto = '') {
   return process.env[nombre] || porDefecto;
 }
 
+/** Un entero positivo de una variable de entorno; vacía, 0, negativa o que no es un número: el valor por defecto. */
+function enteroPositivo(valor, porDefecto) {
+  const n = parseInt(String(valor == null ? '' : valor).trim(), 10);
+  return Number.isFinite(n) && n > 0 ? n : porDefecto;
+}
+
 /**
  * Una lista de números del .env: coma entre números, se ignora todo lo que no sea
  * dígito, con o sin el 9 de celular. Es el mismo parseo para todas las listas.
@@ -160,6 +166,28 @@ module.exports = {
     cachePath: process.env.PRECIOS_CACHE_PATH || path.join(__dirname, '..', 'data', 'precios', 'panel-cache.json'),
     ttlMs: 10 * 60 * 1000,
     timeoutMs: parseInt(process.env.PANEL_TIMEOUT_MS || '8000', 10) || 8000,
+  },
+
+  // TANDAS de chats sin contestar (18/11/2026, src/tandas.js): `#tanda` en el grupo arma una propuesta de
+  // `tamano` chats y NO manda nada; `#tanda-ok <id>` la manda. Vence a las `venceHoras`. Las propuestas
+  // (.md y .json) van a `dir`. Sonnet lee hasta `maxMensajes` del chat y, de eso, hasta `maxCaracteres`.
+  tandas: {
+    dir: process.env.TANDAS_DIR || path.join(__dirname, '..', 'data', 'tandas'),
+    tamano: 40,
+    venceHoras: 6,
+    maxMensajes: 150,
+    maxCaracteres: 24000,
+  },
+
+  // REACTIVACION de Piedra (18/11/2026, src/reactivacion.js): como mucho 2 mensajes por chat, escritos por el
+  // código. Variables NUEVAS (las REACTIVACION_* de iPhone que sigan en el .env no se leen). Apagada si falta.
+  reactivacion: {
+    activa: (process.env.ERASMO_REACTIVACION_ACTIVA || '').trim().toLowerCase() === 'true',
+    topeDia: enteroPositivo(process.env.ERASMO_REACTIVACION_TOPE_DIA, 40),
+    dias1: enteroPositivo(process.env.ERASMO_REACTIVACION_DIAS_1, 2),
+    dias2: enteroPositivo(process.env.ERASMO_REACTIVACION_DIAS_2, 7),
+    ventanaDias: enteroPositivo(process.env.ERASMO_REACTIVACION_VENTANA_DIAS, 30),
+    dir: process.env.REACTIVACION_DIR || path.join(__dirname, '..', 'data', 'reactivacion'),
   },
 
   // Ritmo humano: el bot nunca contesta al instante.

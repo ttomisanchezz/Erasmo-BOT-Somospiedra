@@ -109,6 +109,19 @@ const RESPONDER = {
 };
 
 /**
+ * Solo en una TANDA de chats sin contestar (src/tandas.js, 18/11/2026): terminar sin mandar nada y sin avisar a nadie
+ * (no es `escalar`: no hace falta una persona, hace falta que NO se le escriba). En el pedido de siempre no existe.
+ */
+const NO_CONTESTAR = {
+  name: 'no_contestar',
+  description:
+    'Terminás sin mandarle nada al cliente y SIN avisar a nadie: no hace falta contestar (ya compró o arregló la compra, solo agradeció o se despidió, ' +
+    'ya lo resolvió una persona de la cuenta por otro lado, no es un cliente, o pidió que no le escriban). Si hace falta una persona, es escalar.',
+  strict: true,
+  input_schema: objeto({ motivo: { type: 'string', description: 'Por qué no hace falta contestar, en una frase corta.' } }, ['motivo']),
+};
+
+/**
  * Las herramientas de datos: `{ definicion, correr(input, turno) }`. `definicion` es lo que va a la API
  * (name, description, input_schema, strict); `correr` devuelve lo que vuelve como tool_result (un objeto;
  * con `error`, vuelve como is_error) y anota en `turno.montos` los montos que se pueden escribir (en pesos)
@@ -592,13 +605,89 @@ function armarContexto(s, mensaje, nombre, ahora, hasta = null, { audio = false,
   return { texto, leidos: { historial: historial.length, persona: persona.length, evolution: historial.filter((l) => l && l.evolution).length } };
 }
 
-function armarCuerpo(messages) {
+/**
+ * El pedido de una TANDA de chats sin contestar (tandas.js): lo mismo que `armarContexto`, pero con la conversación
+ * larga que leyó `lectura-larga.js` (`tanda.lineas`, hasta `config.tandas.maxMensajes` y `maxCaracteres`: lo más viejo
+ * queda afuera y el pedido lo dice) y con las instrucciones de la tarea: responder, no contestar o escalar, con
+ * disculpas por la demora si pasó más de un día. Las instrucciones van en el mensaje y no en las reglas: las
+ * reglas (y su hash) son las de siempre.
+ *
+ * `tanda`: { lineas, ultimoDelCliente? } (`lineas`: del historial de estado más lo de Evolution, de la más vieja a la más
+ * nueva). Devuelve { texto, leidos, omitidas }.
+ */
+const LINEAS_QUE_SIEMPRE_ENTRAN = 20;
+const HORAS_PARA_DISCULPARSE = 24;
+
+function armarContextoDeTanda(s, tanda, nombre, ahora) {
+  const limpio = (t) => gemini.sinDatosPersonales(String(t || ''), nombre);
+  const quien = contexto.etiqueta;
+  const todas = (tanda.lineas || []).slice(-config.tandas.maxMensajes);
+  const formateadas = todas.map((m) => `[${haceCuanto(m.ts, ahora)}] ${quien(m)}: ${limpio(m.texto)}`);
+  // Desde lo más nuevo hacia atrás, hasta el tope de caracteres: las 20 últimas entran siempre (las que más pesan).
+  let usados = 0;
+  let desde = formateadas.length;
+  while (desde > 0) {
+    const largo = formateadas[desde - 1].length + 1;
+    if (usados + largo > config.tandas.maxCaracteres && formateadas.length - desde >= LINEAS_QUE_SIEMPRE_ENTRAN) break;
+    usados += largo;
+    desde--;
+  }
+  const quedan = todas.slice(desde);
+  const omitidas = desde;
+  const persona = todas.filter((l) => l && l.humano && String(l.texto || '').trim()).slice(-state.LINEAS_PERSONA);
+  const yaPregunto = salida.preguntasHechas(todas);
+  const sabe = loQueSabe(s, nombre);
+  // Lo que escribió el cliente y nadie contestó: sus últimas líneas seguidas.
+  let inicio = todas.length;
+  while (inicio > 0 && todas[inicio - 1].quien === 'cliente') inicio--;
+  const sinContestar = todas.slice(inicio);
+  const ultimoTs = sinContestar.length ? Number(sinContestar[sinContestar.length - 1].ts) || 0 : Number(tanda.ultimoDelCliente) || 0;
+  const horas = ultimoTs ? (ahora - ultimoTs) / (60 * 60 * 1000) : 0;
+  const demora = horas > HORAS_PARA_DISCULPARSE;
+  const texto = [
+    `Fecha y hora en Neuquén: ${fechaYHora(ahora)}`,
+    '',
+    'TAREA ESPECIAL: este chat quedó SIN CONTESTAR. Lo último lo escribió el cliente y nadie le respondió (el bot todavía no atendía, o quedó pendiente).',
+    'No es una charla en vivo: releé la conversación entera y decidí con qué terminás:',
+    '- responder: si hay algo que contestarle. Aplican las mismas reglas de siempre, con las mismas herramientas (cotizar, buscar_productos, cotizar_envio, mandar_catalogo).',
+    '- no_contestar (con el motivo): si no hace falta escribirle. Mirá sobre todo los ÚLTIMOS 20 mensajes: ya compró o arregló la compra, solo agradeció o se despidió, ya lo resolvió una persona de la cuenta por otro lado, no es un cliente (proveedor, conocido), o pidió que no le escriban.',
+    '- escalar: lo de siempre (lo que hoy escalás, escalás).',
+    demora
+      ? `El cliente escribió ${haceCuanto(ultimoTs, ahora)}: si respondés, el PRIMER mensaje arranca pidiendo disculpas por la demora, corto y natural (por ejemplo "Disculpá la demora en responderte!"), y sigue con la respuesta de verdad.`
+      : `El cliente escribió ${ultimoTs ? haceCuanto(ultimoTs, ahora) : 'hace poco'}: es reciente, no hace falta pedir disculpas por la demora.`,
+    'Con esta tarea, el chat NO está en vivo: nada de lo que digas es "ahora mismo". Una pregunta del cliente que otra persona ya contestó no se contesta de nuevo.',
+    '',
+    'Lo que el sistema ya sabe de este chat:',
+    ...(sabe.length ? sabe.map((l) => `- ${l}`) : ['- nada todavía']),
+    '',
+    'Lo último que escribió una persona de la cuenta (no el bot), de lo más viejo a lo más nuevo:',
+    ...(persona.length ? persona.map((l) => `- ${haceCuanto(l.ts, ahora)}: "${limpio(l.texto).replace(/\s+/g, ' ').trim()}"`) : ['- nada']),
+    '',
+    `Conversación (los últimos ${quedan.length} mensajes, de la más vieja a la más nueva)${omitidas ? ` (otros ${omitidas} mensajes más viejos no entran en este pedido)` : ''}:`,
+    ...(quedan.length ? formateadas.slice(desde) : ['(vacío)']),
+    '',
+    'Preguntas que ya le hiciste en este chat (no las repitas, ni igual ni con otras palabras):',
+    ...(yaPregunto.length ? yaPregunto.map((p) => `- ${limpio(p)}`) : ['- ninguna']),
+    '',
+    'Lo último que escribió el cliente y nadie contestó:',
+    '"""',
+    sinContestar.length ? limpio(sinContestar.map((l) => l.texto).join('\n')) : '(nada)',
+    '"""',
+  ].join('\n');
+  return {
+    texto,
+    omitidas,
+    leidos: { historial: quedan.length, persona: persona.length, evolution: quedan.filter((l) => l && l.evolution).length },
+  };
+}
+
+function armarCuerpo(messages, { extras = [] } = {}) {
   const esfuerzo = ESFUERZOS.includes(config.cerebro.esfuerzo) ? config.cerebro.esfuerzo : 'medium';
   return {
     model: config.cerebro.modelo,
     max_tokens: MAX_TOKENS,
     system: [{ type: 'text', text: REGLAS, cache_control: { type: 'ephemeral' } }],
-    tools: herramientasEfectivas(),
+    tools: [...herramientasEfectivas(), ...extras],
     tool_choice: { type: 'auto' },
     output_config: { effort: esfuerzo },
     messages,
@@ -680,7 +769,7 @@ function textoDeCorreccion(guardia) {
  * `image` en base64 en el primer mensaje, después del texto del contexto, y la última lleva
  * `cache_control`. `fotos` ({ mandadas, sinVer }) es lo que dice el pedido.
  */
-async function pensar({ chatId, mensaje, nombre = '', ahora = Date.now(), hasta = null, audio = false, imagenes = [], fotos = null, enVivo = false } = {}) {
+async function pensar({ chatId, mensaje, nombre = '', ahora = Date.now(), hasta = null, audio = false, imagenes = [], fotos = null, enVivo = false, tanda = null } = {}) {
   const t0 = Date.now();
   const uso = usoEnCero();
   const turno = turnoEnCero();
@@ -707,8 +796,10 @@ async function pensar({ chatId, mensaje, nombre = '', ahora = Date.now(), hasta 
     // que se le pregunta a Sonnet.
     const s = state.obtener(chatId);
     const enElPedido = mandadas ? { mandadas, vistas: vistas.length, sinVer } : null;
-    const ctx = armarContexto(s, mensaje, nombre, ahora, hasta, { audio, fotos: enElPedido });
+    // Una TANDA de chats sin contestar (tandas.js): conversación larga y la herramienta `no_contestar`.
+    const ctx = tanda ? armarContextoDeTanda(s, tanda, nombre, ahora) : armarContexto(s, mensaje, nombre, ahora, hasta, { audio, fotos: enElPedido });
     leidos = ctx.leidos;
+    const extras = tanda ? [NO_CONTESTAR] : [];
     const fotosDelPedido = vistas.map((im, i) => ({
       type: 'image',
       source: { type: 'base64', media_type: im.media_type, data: im.data },
@@ -717,7 +808,7 @@ async function pensar({ chatId, mensaje, nombre = '', ahora = Date.now(), hasta 
     const messages = [{ role: 'user', content: [{ type: 'text', text: ctx.texto, cache_control: { type: 'ephemeral' } }, ...fotosDelPedido] }];
 
     for (let vuelta = 1; vuelta <= MAX_VUELTAS; vuelta++) {
-      const resp = await llamarApi(armarCuerpo(messages));
+      const resp = await llamarApi(armarCuerpo(messages, { extras }));
       sumarUso(uso, resp && resp.usage);
       if (resp.stop_reason === 'refusal') return escala('Sonnet no quiso contestar (refusal)');
       const content = Array.isArray(resp.content) ? resp.content : [];
@@ -732,6 +823,14 @@ async function pensar({ chatId, mensaje, nombre = '', ahora = Date.now(), hasta 
         herramientas.push('escalar');
         const motivo = String((escalo.input && escalo.input.motivo) || '').trim() || 'Sonnet escaló sin motivo';
         return escala(motivo, corregida ? { corregida } : {});
+      }
+      // Solo en una tanda: no hace falta contestarle. No manda nada y no avisa a nadie; le gana a un `responder` de la
+      // misma respuesta (lo más conservador: no se le escribe).
+      const nada = tanda ? usos.find((b) => b.name === 'no_contestar') : null;
+      if (nada) {
+        herramientas.push('no_contestar');
+        const motivo = String((nada.input && nada.input.motivo) || '').trim() || 'Sonnet no dio el motivo';
+        return fin({ mensajes: [], escalar: false, noContestar: true, motivo, guardia: null, ...comun(), ...(corregida ? { corregida } : {}) });
       }
       if (respondio) {
         // Las herramientas de datos que vinieron en la MISMA respuesta que `responder` corren antes de mirarla:
@@ -866,6 +965,72 @@ async function contestar({ chatId, mensaje, nombre = '', ahora = Date.now(), aud
   return { r, resultado: comoResultado(chatId, r, { nombre, ahora }) };
 }
 
+// ---------------------------------------------------------------------------
+// La reactivación: ¿vale la pena escribirle? (src/reactivacion.js, 18/11/2026)
+// ---------------------------------------------------------------------------
+
+const DECIDIR_REACTIVACION = {
+  name: 'decidir',
+  description: 'Terminás con tu decisión: mandar true si corresponde escribirle el recordatorio, false si no (con el motivo).',
+  strict: true,
+  input_schema: objeto(
+    { mandar: { type: 'boolean', description: 'true: se le escribe el recordatorio. false: no.' }, motivo: { type: 'string', description: 'Por qué, en una frase corta.' } },
+    ['mandar', 'motivo']
+  ),
+};
+
+/** Las instrucciones de la consulta de la reactivación: corta, sin las reglas de venta (Sonnet no escribe nada acá). */
+const SISTEMA_REACTIVACION =
+  'Sos el que decide, para Somos Piedra (un local de Neuquén que vende piedra natural y sus insumos), si a un cliente que dejó de ' +
+  'contestar se le manda un recordatorio comercial corto («cómo vas con la piedra que estabas viendo, ¿pudiste avanzar?»). Vas a ver ' +
+  'los últimos mensajes del chat. NO escribís el recordatorio: solo decidís, llamando a la herramienta decidir.\n' +
+  'mandar = false si: ya compró o arregló la compra con nosotros; ya no le interesa o dijo que no (aunque sea con buenos modos); pidió que no ' +
+  'le escriban o que dejen de escribirle; el tema ya se resolvió (otra persona de la cuenta lo cerró, se coordinó la entrega, se pasó ' +
+  'a otro canal); o no parece un cliente (proveedor, conocido, un bot, alguien equivocado, una consulta que no es de compra).\n' +
+  'mandar = true solo si sigue siendo una consulta de compra abierta, sin resolver, donde un recordatorio amable tiene sentido.\n' +
+  'Ante la duda, mandar = false: es mejor no escribirle que molestar a quien no quiere.';
+
+/**
+ * ¿A este cliente se le manda el recordatorio de la reactivación? Un pedido corto a Sonnet con los últimos mensajes
+ * (`lineas`, las del chat; entran las últimas 20) y una sola herramienta. Devuelve { mandar, motivo, uso, usd } o { error }
+ * (la herramienta no llegó, falló la API o falta la clave): con error NO se manda y NO se descarta el chat (se reintenta).
+ * Nunca tira. No toca el estado.
+ */
+async function decidirReactivacion({ chatId, lineas = [], nombre = '', ahora = Date.now() } = {}) {
+  const uso = usoEnCero();
+  const t0 = Date.now();
+  const fin = (r) => ({ ...r, uso, usd: seisDecimales(costo(uso)), ms: Date.now() - t0 });
+  try {
+    if (!config.cerebro.apikey) return fin({ error: 'falta ANTHROPIC_API_KEY' });
+    const limpio = (t) => gemini.sinDatosPersonales(String(t || ''), nombre);
+    const ultimas = (lineas || []).slice(-20);
+    const texto = [
+      `Fecha y hora en Neuquén: ${fechaYHora(ahora)}`,
+      '',
+      `Los últimos ${ultimas.length} mensajes del chat (de la más vieja a la más nueva). El último lo escribió la cuenta del negocio y el cliente no contestó:`,
+      ...(ultimas.length ? ultimas.map((m) => `[${haceCuanto(m.ts, ahora)}] ${contexto.etiqueta(m)}: ${limpio(m.texto)}`) : ['(vacío)']),
+    ].join('\n');
+    const esfuerzo = ESFUERZOS.includes(config.cerebro.esfuerzo) ? config.cerebro.esfuerzo : 'medium';
+    const cuerpo = {
+      model: config.cerebro.modelo,
+      max_tokens: 2000,
+      system: [{ type: 'text', text: SISTEMA_REACTIVACION }],
+      tools: [DECIDIR_REACTIVACION],
+      tool_choice: { type: 'auto' },
+      output_config: { effort: esfuerzo },
+      messages: [{ role: 'user', content: [{ type: 'text', text: texto }] }],
+    };
+    const resp = await llamarApi(cuerpo);
+    sumarUso(uso, resp && resp.usage);
+    const bloques = Array.isArray(resp.content) ? resp.content : [];
+    const uno = bloques.find((b) => b && b.type === 'tool_use' && b.name === 'decidir');
+    if (!uno || !uno.input || typeof uno.input.mandar !== 'boolean') return fin({ error: 'Sonnet no terminó con la herramienta decidir' });
+    return fin({ mandar: uno.input.mandar, motivo: String(uno.input.motivo || '').trim() || 'Sonnet no dio el motivo' });
+  } catch (e) {
+    return fin({ error: (e && e.message) || String(e) });
+  }
+}
+
 // --- Los avisos al grupo -------------------------------------------------------
 
 /** "US$0,0077": cuatro decimales, con coma. */
@@ -964,6 +1129,9 @@ function resumenesDeLaHora(ahora = Date.now()) {
 module.exports = {
   pensar,
   contestar,
+  decidirReactivacion,
+  armarContextoDeTanda,
+  NO_CONTESTAR,
   comoResultado,
   quienAtiende,
   esChatNuevo,
