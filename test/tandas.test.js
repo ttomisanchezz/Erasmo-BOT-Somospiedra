@@ -482,6 +482,40 @@ async function mandarTanda(id, extra = '') {
     assert.ok(b);
   });
 
+  await caso('un #reset justo después de entregar el primer mensaje: el chat cuenta como enviado y queda marcado', async () => {
+    const chatId = sembrar(1);
+    const id = await armarTanda();
+    const original = evolution.enviarTexto;
+    evolution.enviarTexto = async (...args) => {
+      const r = await original(...args);
+      state.reiniciar(chatId);
+      return r;
+    };
+    try {
+      await mandarTanda(id);
+    } finally {
+      evolution.enviarTexto = original;
+    }
+    assert.strictEqual(aClientes.length, 1);
+    assert.strictEqual(state.datosDeTandas().chats[chatId].resultado, 'enviado');
+    assert.ok(grupoCon(/^Tanda \d+ mandada: 1 contestados/).length === 1, alGrupo.join('|'));
+  });
+
+  await caso('la hora de un mensaje que el estado ya tiene es la de Evolution: una respuesta de una persona entre el mensaje del cliente y su webhook no queda "antes"', async () => {
+    const t0 = Date.now() - 3 * DIA;
+    // El estado anotó el mensaje del cliente cuando lo procesó (5 s tarde); Evolution tiene la hora de verdad y la respuesta
+    // de una persona dos segundos después del mensaje, que el estado no vio.
+    const chatId = sembrar(1, { lineas: [{ quien: 'cliente', texto: 'hola, quiero laja ocre', ts: t0 + 5000, id: 'C-1' }] });
+    evolution.buscarMensajesDeChat = async (j) => [
+      { key: { remoteJid: j, fromMe: false, id: 'C-1' }, message: { conversation: 'hola, quiero laja ocre' }, messageTimestamp: Math.floor(t0 / 1000) },
+      { key: { remoteJid: j, fromMe: true, id: 'P-1' }, message: { conversation: 'Hola! Te paso el precio' }, messageTimestamp: Math.floor((t0 + 2000) / 1000) },
+    ];
+    await armarTanda();
+    assert.strictEqual(sonnet.pedidos.length, 0, 'ya contestó una persona: no se le pregunta a Sonnet');
+    assert.strictEqual(tandas.leerTanda(idDeLaTanda()).chats[0].accion, 'no_contestar');
+    assert.ok(chatId);
+  });
+
   await caso('si no se puede verificar el chat en Evolution al mandar, no se le escribe', async () => {
     sembrar(1);
     const id = await armarTanda();

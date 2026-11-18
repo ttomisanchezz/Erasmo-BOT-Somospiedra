@@ -461,6 +461,64 @@ async function caso(nombre, fn) {
     assert.strictEqual(reactivacion.marcasDe(chatId).m1, undefined);
   });
 
+  await caso('un #reset justo después de que Evolution entregó el mensaje: igual cuenta (marca y tope), no se le vuelve a mandar', async () => {
+    const chatId = sembrar(1);
+    const original = evolution.enviarTexto;
+    evolution.enviarTexto = async (...args) => {
+      const r = await original(...args);
+      state.reiniciar(chatId);
+      return r;
+    };
+    const r = await barrido(MIERCOLES);
+    assert.strictEqual(r.enviados, 1, JSON.stringify(r));
+    assert.strictEqual(aClientes.length, 1);
+    assert.ok(reactivacion.marcasDe(chatId).m1, 'la marca se escribe aunque el chat se haya reiniciado');
+    assert.strictEqual(reactivacion.enviadosHoy(MIERCOLES), 1);
+    sembrar(1);
+    assert.strictEqual((await barrido(ar(8, 12))).enviados, 1, 'el que sigue es el 2, no otro 1');
+    assert.ok(aClientes[1].texto.includes('Último mensajito'));
+  });
+
+  await caso('si el envío revienta sin saber si salió, la marca queda (nunca más de 2): no se reintenta a ciegas', async () => {
+    const chatId = sembrar(1);
+    evolution.enviarTexto = async () => {
+      throw new Error('se cortó la red');
+    };
+    assert.strictEqual((await barrido(MIERCOLES)).enviados, 0);
+    assert.ok(reactivacion.marcasDe(chatId).m1, 'queda reservado el mensaje 1');
+    assert.strictEqual(reactivacion.enviadosHoy(MIERCOLES), 0, 'pero no cuenta como enviado');
+    evolution.enviarTexto = p.evolution.enviarTexto;
+    assert.strictEqual((await barrido(MIERCOLES)).enviados, 0, 'el 1 no se repite (el 2 espera sus 7 días)');
+  });
+
+  await caso('la franja se mira otra vez justo antes de mandar: lo que cruza las 19:00 mientras "escribe…" no sale', async () => {
+    sembrar(1);
+    const original = evolution.mostrarEscribiendo;
+    evolution.mostrarEscribiendo = async () => p.dormir(700);
+    try {
+      assert.strictEqual((await barrido(ar(0, 19, 0) - 300)).enviados, 0);
+    } finally {
+      evolution.mostrarEscribiendo = original;
+    }
+    assert.strictEqual(aClientes.length, 0);
+  });
+
+  await caso('y también después de la pausa entre un mensaje y el siguiente', async () => {
+    sembrar(1);
+    sembrar(2);
+    const enviadosA = [];
+    const r = await reactivacion.revisar({
+      ahora: ar(0, 19, 0) - 300,
+      enviar: async (chatId) => {
+        enviadosA.push(chatId);
+        return { salio: true };
+      },
+      esperar: () => p.dormir(700),
+    });
+    assert.strictEqual(r.enviados, 1);
+    assert.strictEqual(enviadosA.length, 1, 'el segundo ya es después de las 19');
+  });
+
   await caso('si Evolution no confirma el envío, no cuenta para el tope ni queda marcado', async () => {
     const chatId = sembrar(1);
     evolution.enviarTexto = async () => ({ bloqueado: true, motivo: 'fuera de la lista de prueba' });

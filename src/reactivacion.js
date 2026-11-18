@@ -259,21 +259,27 @@ async function revisar({ ahora = Date.now(), frenoGeneral = () => null, frenoDeC
       }
       if (!enFranja(reloj()) || !interruptor.prendida()) break;
       if (enviados > 0) await esperar();
-      // Última mirada antes de mandar (la espera pudo cambiar algo).
+      // Última mirada antes de mandar (la espera pudo cambiar algo, también la hora: la franja se cierra a las 19).
+      if (!enFranja(reloj()) || !interruptor.prendida()) break;
       if (frenoDeChat(c.chatId) || frenoGeneral()) continue;
       const texto = textos.textoDe(c.tipo, { nombre: c.nombre, producto: c.producto });
+      // La marca se reserva ANTES de mandar: si el bot se corta entre que Evolution entrega y que se anota, el mensaje no se
+      // repite ("nunca más de 2"). Si no salió (un candado, Evolution lo frenó), se devuelve; si el envío revienta sin saber
+      // si salió, se queda (es mejor no mandar el 2 que mandar dos veces el 1).
+      const reservada = m[c.tipo];
+      anotar(c.chatId, { [c.tipo]: reloj() });
       let r;
       try {
-        r = await enviar(c.chatId, texto, c);
+        r = await enviar(c.chatId, texto, c, { enFranja: () => enFranja(reloj()) });
       } catch (e) {
-        console.error(`[reactivacion] ${c.chatId}: falló al mandar:`, e.message);
-        r = { salio: false, motivo: e.message };
+        console.error(`[reactivacion] ${c.chatId}: falló al mandar (no sé si salió: la marca queda):`, e.message);
+        continue;
       }
       if (!r || !r.salio) {
+        anotar(c.chatId, { [c.tipo]: reservada });
         console.log(`[reactivacion] ${c.chatId}: no salió${r && r.motivo ? ` (${r.motivo})` : ''}`);
         continue;
       }
-      anotar(c.chatId, { [c.tipo]: reloj() });
       sumarAlDia(reloj());
       state.guardarInternoYa();
       enviados++;

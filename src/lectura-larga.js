@@ -49,7 +49,12 @@ async function leerLargo(chatId, { cuantos = 150, buscar = null, esperaMs = ESPE
   const esDelBot = (id) => delBot.has(id) || autoria.anotado(chatId, id);
   const deEvolution = contexto.lineasDe(registros, { esDelBot });
   const nuevas = contexto.nuevasLineas(guardado, deEvolution, { sinLimite: true });
-  const lineas = [...guardado, ...nuevas].sort((a, b) => (Number(a.ts) || 0) - (Number(b.ts) || 0));
+  // La hora de un mensaje que el estado ya tiene (mismo id) es la de Evolution, la del mensaje de verdad: la del estado es
+  // la de cuando el webhook lo procesó, unos segundos tarde, y mezclada con la de Evolution podía poner al cliente "después"
+  // de una respuesta de una persona que el estado todavía no vio.
+  const horaDe = new Map(deEvolution.filter((l) => l.id).map((l) => [String(l.id), l.ts]));
+  const delEstado = guardado.map((l) => (l.id && horaDe.has(String(l.id)) ? { ...l, ts: horaDe.get(String(l.id)) } : l));
+  const lineas = [...delEstado, ...nuevas].sort((a, b) => (Number(a.ts) || 0) - (Number(b.ts) || 0));
   return { lineas, evolution: true, agregadas: nuevas.length, ultimaEvolution: deEvolution[deEvolution.length - 1] || null, error: null };
 }
 

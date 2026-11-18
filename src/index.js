@@ -1418,6 +1418,7 @@ const clienteEscribioDespues = (chatId, ts) => ((state.todos()[chatId] || {}).hi
 async function mandarChatDeTanda(item, tandaId) {
   const chatId = item.chatId;
   const donde = { origen: 'tanda', tanda: `T${tandaId}` };
+  let salieron = 0;
   try {
     return await tandaEnCurso.run({ chatId, generacion: state.generacion(chatId) }, async () => {
       const freno = frenoDeChatMasivo(chatId) || (await cambioEnElChat(chatId, item.ultimaLinea));
@@ -1451,6 +1452,8 @@ async function mandarChatDeTanda(item, tandaId) {
         if (corte) break;
         const t = acciones.comoTexto(m);
         const enviado = await enviarAlCliente(chatId, 'texto', t, () => evolution.enviarTexto(chatId, t, 0), acciones.marcasDe(m), donde);
+        // Antes de tocar el estado: un #reset justo ahora no puede hacer que lo que ya salió no cuente.
+        if (autoria.llego(enviado)) salieron = enviados + 1;
         anotarEnvio(chatId, enviado);
         if (autoria.llego(enviado)) {
           enviados++;
@@ -1470,7 +1473,10 @@ async function mandarChatDeTanda(item, tandaId) {
       return { resultado: 'enviado', ...(corte ? { motivo: `salieron ${enviados} de ${mensajes.length}: ${corte}` } : {}) };
     });
   } catch (e) {
-    if (e instanceof state.ChatReiniciado) return { resultado: 'salteado', motivo: 'se hizo #reset mientras se mandaba' };
+    if (e instanceof state.ChatReiniciado) {
+      // Si ya había salido algo, el chat cuenta como atendido (queda marcado y no vuelve a otra tanda).
+      return salieron ? { resultado: 'enviado', motivo: `salieron ${salieron}: se hizo #reset mientras se mandaba` } : { resultado: 'salteado', motivo: 'se hizo #reset mientras se mandaba' };
+    }
     throw e;
   }
 }
@@ -1480,7 +1486,7 @@ async function mandarChatDeTanda(item, tandaId) {
  * ritmo, y otra vez los candados justo antes de mandar. El texto lo escribió el código (reactivacion-textos.js). Si sale
  * queda en el historial y el chat con `atiendeSonnet: true`. Devuelve { salio, motivo }.
  */
-async function mandarReactivacion(chatId, texto, cand) {
+async function mandarReactivacion(chatId, texto, cand, { enFranja = () => true } = {}) {
   try {
     return await tandaEnCurso.run({ chatId, generacion: state.generacion(chatId) }, async () => {
       const antes = frenoDeChatMasivo(chatId) || (clienteEscribioDespues(chatId, cand.ultimaCuenta.ts) ? 'el cliente escribió' : null);
@@ -1488,13 +1494,27 @@ async function mandarReactivacion(chatId, texto, cand) {
       await evolution.mostrarEscribiendo(chatId, config.ritmo.entreMensajesMs);
       await dormir(config.ritmo.entreMensajesMs);
       state.comprobarVigente(chatId);
-      const justo = frenoGeneralDeEnvio() || frenoDeChatMasivo(chatId) || (clienteEscribioDespues(chatId, cand.ultimaCuenta.ts) ? 'el cliente escribió' : null);
+      const justo = frenoGeneralDeEnvio() || frenoDeChatMasivo(chatId) || (clienteEscribioDespues(chatId, cand.ultimaCuenta.ts) ? 'el cliente escribió' : null) || (enFranja() ? null : 'ya pasó la franja (lunes a sábado de 10 a 19)');
       if (justo) return { salio: false, motivo: justo };
       const enviado = await enviarAlCliente(chatId, 'texto', texto, () => evolution.enviarTexto(chatId, texto, 0), null, { origen: 'reactivacion', tanda: null });
-      anotarEnvio(chatId, enviado);
-      if (!autoria.llego(enviado)) return { salio: false, motivo: (enviado && enviado.motivo) || 'Evolution no lo confirmó' };
-      state.agregarAlHistorial(chatId, 'vendedor', texto, { id: enviado.key.id });
-      state.actualizar(chatId, { ultimoBot: Date.now(), atiendeSonnet: true, atiendeSonnetDesde: Date.now() });
+      const salio = autoria.llego(enviado);
+      if (!salio) {
+        try {
+          anotarEnvio(chatId, enviado);
+        } catch (e) {
+          if (!(e instanceof state.ChatReiniciado)) throw e;
+        }
+        return { salio: false, motivo: (enviado && enviado.motivo) || 'Evolution no lo confirmó' };
+      }
+      // Ya salió: un #reset justo ahora (cuando Evolution ya entregó) no puede hacer que no cuente.
+      try {
+        anotarEnvio(chatId, enviado);
+        state.agregarAlHistorial(chatId, 'vendedor', texto, { id: enviado.key.id });
+        state.actualizar(chatId, { ultimoBot: Date.now(), atiendeSonnet: true, atiendeSonnetDesde: Date.now() });
+      } catch (e) {
+        if (!(e instanceof state.ChatReiniciado)) throw e;
+        console.log(`[reactivacion] ${chatId}: se hizo #reset justo cuando salía el mensaje: cuenta igual`);
+      }
       return { salio: true };
     });
   } catch (e) {
