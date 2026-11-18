@@ -196,6 +196,8 @@ Qué cambió: `src/tandas.js`, `src/reactivacion.js`, `src/reactivacion-textos.j
 
 ### Riesgos que quedan
 
+- **Tres mensajes que el cliente no pidió**: un chat de la tanda recibe su respuesta, y si el cliente no contesta puede recibir el mensaje 1 de la reactivación a los 2 días y el 2 a los 7 días del 1. Está dentro de lo pedido, pero es una decisión de Tomás (si no, un chat que salió en una tanda se podría marcar para que la reactivación no lo tome).
+- **Si falla algo a mitad de una tanda** (un error inesperado), el grupo recibe un ⚠️ y la tanda queda cerrada ("mandada", con lo que salió anotado), sin trabar la próxima; un disco que no deja guardar el `.json` no corta el envío (el resumen final lo avisa).
 - **Los precios de la propuesta valen hasta 6 h**: lo que Sonnet cotizó al armar la tanda es lo que sale al mandarla; si el panel cambia en ese rato, sale el viejo. Por eso vence a las 6 h.
 - **Un chat con el estado atrasado** (una persona contestó desde el celular con el bot caído) se detecta por Evolution al armar y al mandar; si Evolution falla, el chat se saltea. En la reactivación, un chat cuyo estado no coincide con Evolution se salta en cada barrido sin descartarse; con más de 12 chats así seguidos al tope de la lista (se evalúan 12 por barrido) podrían demorar a los demás.
 - **Dos mutaciones equivalentes** (candados repetidos a propósito, así que romper uno solo no cambia el resultado): `#apagar` se mira dos veces en la reactivación (`revisar` y `frenoGeneralDeEnvio`), y los candados de `revisar` justo antes de mandar se repiten en `mandarReactivacion`. Las demás hacen fallar su test.

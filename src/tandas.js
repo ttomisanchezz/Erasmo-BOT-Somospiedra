@@ -108,6 +108,21 @@ function leerTanda(id) {
   }
 }
 
+/**
+ * Como `guardarTanda`, pero sin tirar: en medio de un envío, un disco que falla no puede cortar la tanda ni dejarla
+ * trabada (lo que ya salió quedó anotado en el estado). `t.sinArchivo` lo dice en el resumen final.
+ */
+function guardarSeguro(t) {
+  try {
+    guardarTanda(t);
+    return true;
+  } catch (e) {
+    console.error(`[tandas] no pude guardar el archivo de la tanda ${t.id}:`, e.message);
+    t.sinArchivo = true;
+    return false;
+  }
+}
+
 /** Guarda el .json (con un archivo temporal, así un corte no deja uno a medias) y el .md. */
 function guardarTanda(t) {
   fs.mkdirSync(config.tandas.dir, { recursive: true });
@@ -440,7 +455,12 @@ function ok({ id, omitir = [], ahora = Date.now(), frenoGeneral = () => null, ma
   t.estado = 'mandando';
   t.omitidos = [...new Set(omitir)].sort((a, b) => a - b);
   t.empezo = ahora;
-  guardarTanda(t);
+  try {
+    guardarTanda(t);
+  } catch (e) {
+    mandando = false;
+    return sin(`⚠️ No pude guardar el archivo de la tanda ${id} (${e.message}). No mandé nada.`);
+  }
   const d = state.datosDeTandas();
   d.actual = { id, estado: 'mandando', creada: t.creada, vence: t.vence };
   state.guardarInternoYa();
@@ -498,12 +518,12 @@ async function mandarTodo(t, { frenoGeneral, mandarChat, esperar }) {
       } else if (r.resultado === 'frenado') {
         corte = r.motivo || 'se frenó el envío';
       }
-      guardarTanda(t);
+      guardarSeguro(t);
     }
   } finally {
     t.estado = 'mandada';
     t.termino = Date.now();
-    guardarTanda(t);
+    guardarSeguro(t);
     const d = state.datosDeTandas();
     if (d.actual && d.actual.id === t.id) d.actual = null;
     state.guardarInternoYa();
@@ -522,6 +542,7 @@ function resumenFinal(t) {
     if (otros.length > 15) lineas.push(`• …y ${otros.length - 15} más (están en ${rutaParaMostrar(t.id)})`);
   }
   if (t.omitidos && t.omitidos.length) lineas.push(`Sacados a mano: ${t.omitidos.join(', ')}.`);
+  if (t.sinArchivo) lineas.push('Ojo: no pude guardar el archivo de la tanda en data/tandas (lo que salió quedó anotado en el estado).');
   return lineas.join('\n');
 }
 

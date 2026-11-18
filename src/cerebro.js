@@ -617,6 +617,8 @@ function armarContexto(s, mensaje, nombre, ahora, hasta = null, { audio = false,
  */
 const LINEAS_QUE_SIEMPRE_ENTRAN = 20;
 const HORAS_PARA_DISCULPARSE = 24;
+/** El ejemplo de disculpas que lleva el pedido de la tanda: tiene que pasar la guardia (test/tandas.test.js lo verifica). */
+const EJEMPLO_DE_DISCULPAS = 'Disculpá la demora en responderte!';
 
 function armarContextoDeTanda(s, tanda, nombre, ahora) {
   const limpio = (t) => gemini.sinDatosPersonales(String(t || ''), nombre);
@@ -653,7 +655,7 @@ function armarContextoDeTanda(s, tanda, nombre, ahora) {
     '- no_contestar (con el motivo): si no hace falta escribirle. Mirá sobre todo los ÚLTIMOS 20 mensajes: ya compró o arregló la compra, solo agradeció o se despidió, ya lo resolvió una persona de la cuenta por otro lado, no es un cliente (proveedor, conocido), o pidió que no le escriban.',
     '- escalar: lo de siempre (lo que hoy escalás, escalás).',
     demora
-      ? `El cliente escribió ${haceCuanto(ultimoTs, ahora)}: si respondés, el PRIMER mensaje arranca pidiendo disculpas por la demora, corto y natural (por ejemplo "Disculpá la demora en responderte!"), y sigue con la respuesta de verdad.`
+      ? `El cliente escribió ${haceCuanto(ultimoTs, ahora)}: si respondés, el PRIMER mensaje arranca pidiendo disculpas por la demora, corto y natural (por ejemplo "${EJEMPLO_DE_DISCULPAS}"), y sigue con la respuesta de verdad. Las disculpas no prometen nada: sin "te escribo", "te aviso", "te confirmo" ni "en un ratito".`
       : `El cliente escribió ${ultimoTs ? haceCuanto(ultimoTs, ahora) : 'hace poco'}: es reciente, no hace falta pedir disculpas por la demora.`,
     'Con esta tarea, el chat NO está en vivo: nada de lo que digas es "ahora mismo". Una pregunta del cliente que otra persona ya contestó no se contesta de nuevo.',
     '',
@@ -1131,6 +1133,7 @@ module.exports = {
   contestar,
   decidirReactivacion,
   armarContextoDeTanda,
+  EJEMPLO_DE_DISCULPAS,
   NO_CONTESTAR,
   comoResultado,
   quienAtiende,

@@ -1552,7 +1552,14 @@ async function comandoDeTandas(cmd) {
   }
   const r = tandas.ok({ id: cmd.id, omitir: cmd.omitir, frenoGeneral: frenoGeneralDeEnvio, mandarChat: mandarChatDeTanda, esperar: () => dormir(esperaAleatoria()) });
   await alGrupo(r.aviso);
-  if (r.trabajo) enBackground(r.trabajo.then(alGrupo).catch((e) => console.error('[tandas] la tanda falló:', e.message)));
+  if (r.trabajo) {
+    enBackground(
+      r.trabajo.then(alGrupo).catch(async (e) => {
+        console.error('[tandas] la tanda falló:', e);
+        await alGrupo(`⚠️ La tanda ${cmd.id} se cortó por un error (${e.message}). Lo que ya salió quedó anotado en su archivo de data/tandas; no mando más. Revisalo antes de armar otra.`);
+      })
+    );
+  }
 }
 
 /** #reactivar y #reactivar-prueba, escritos por la cuenta en el grupo interno. */

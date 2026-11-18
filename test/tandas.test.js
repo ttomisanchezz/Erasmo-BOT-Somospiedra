@@ -217,6 +217,13 @@ async function mandarTanda(id, extra = '') {
     assert.strictEqual(body.system[0].text, p.cerebro.REGLAS, 'las reglas no cambian');
   });
 
+  await caso('las disculpas que el pedido da como ejemplo (y otras comunes) pasan la guardia: no se escala por pedir perdón', () => {
+    assert.ok(p.cerebro.EJEMPLO_DE_DISCULPAS.length > 10);
+    for (const t of [p.cerebro.EJEMPLO_DE_DISCULPAS, 'Perdón la demora!', 'Disculpá que te respondo recién ahora', 'Perdón por no haberte respondido antes', 'Disculpá la demora, recién veo tu mensaje.']) {
+      assert.strictEqual(p.cerebro.revisarSalida([t], []).guardia, null, t);
+    }
+  });
+
   await caso('hace menos de 24 h no pide disculpas por la demora', async () => {
     sembrar(1, { hace: 5 * HORA });
     await armarTanda();
@@ -424,6 +431,19 @@ async function mandarTanda(id, extra = '') {
     assert.strictEqual(otra, id + 1, 'la vencida ya no bloquea');
   });
 
+  await caso('#tanda-no de una propuesta vencida da ❓: ya venció, no hay nada para descartar', async () => {
+    sembrar(1);
+    const id = await armarTanda();
+    const t = tandas.leerTanda(id);
+    t.vence = Date.now() - 1000;
+    fs.writeFileSync(tandas.rutaJson(id), JSON.stringify(t));
+    state.datosDeTandas().actual.vence = t.vence;
+    alGrupo.length = 0;
+    await enGrupo(`#tanda-no ${id}`);
+    assert.ok(grupoCon(/^❓.*ya venció/).length === 1, alGrupo.join('|'));
+    assert.strictEqual(tandas.leerTanda(id).estado, 'vencida');
+  });
+
   await caso('si desde la propuesta escribió el cliente, ese chat se saltea y se avisa', async () => {
     const a = sembrar(1);
     sembrar(2);
@@ -547,6 +567,53 @@ async function mandarTanda(id, extra = '') {
     await mandarTanda(id);
     assert.strictEqual(aClientes.length, 0);
     assert.ok(/ya se lo había dicho/.test(grupoCon(/^Tanda \d+ mandada/)[0]), alGrupo.join('|'));
+  });
+
+  await caso('si el archivo de la tanda no se puede guardar al mandar, no se manda nada y no queda trabada', async () => {
+    sembrar(1);
+    const id = await armarTanda();
+    const escribir = fs.writeFileSync;
+    fs.writeFileSync = (ruta, ...resto) => {
+      if (String(ruta).includes(`${id}.json`)) throw new Error('disco lleno');
+      return escribir(ruta, ...resto);
+    };
+    try {
+      await mandarTanda(id);
+      assert.strictEqual(aClientes.length, 0);
+      assert.ok(grupoCon(/^⚠️ No pude guardar el archivo de la tanda/).length === 1, alGrupo.join('|'));
+    } finally {
+      fs.writeFileSync = escribir;
+    }
+    alGrupo.length = 0;
+    await mandarTanda(id);
+    assert.strictEqual(aClientes.length, 1, 'con el disco bien, se puede mandar');
+  });
+
+  await caso('si algo se rompe a mitad de la tanda, el grupo se entera y la tanda no queda trabada', async () => {
+    for (let i = 1; i <= 3; i++) sembrar(i, { hace: i * HORA });
+    const id = await armarTanda();
+    const interruptor = require('../src/interruptor');
+    const prendida = interruptor.prendida;
+    const original = evolution.enviarTexto;
+    evolution.enviarTexto = async (...args) => {
+      const r = await original(...args);
+      interruptor.prendida = () => {
+        throw new Error('algo se rompió');
+      };
+      return r;
+    };
+    try {
+      await mandarTanda(id);
+    } finally {
+      evolution.enviarTexto = original;
+      interruptor.prendida = prendida;
+    }
+    assert.strictEqual(aClientes.length, 1, 'salió uno y se cortó');
+    assert.ok(grupoCon(/^⚠️ La tanda \d+ se cortó por un error \(algo se rompió\)/).length === 1, alGrupo.join('|'));
+    assert.strictEqual(tandas.leerTanda(id).estado, 'mandada', 'queda cerrada, no "mandando"');
+    assert.strictEqual(state.datosDeTandas().actual, null, 'no bloquea a la próxima');
+    const otra = await armarTanda();
+    assert.strictEqual(otra, id + 1);
   });
 
   await caso('un #apagar mientras se manda frena lo que falta', async () => {
