@@ -485,6 +485,11 @@ async function mandarTanda(id, extra = '') {
     await mandarTanda(id);
     assert.deepStrictEqual(aClientes.map((m) => m.numero), [chats[6]]);
     assert.ok(/No salieron 6/.test(grupoCon(/^Tanda \d+ mandada/)[0]));
+    // Un chat salteado no se toca: ni ficha, ni propuesta anotada, ni nada de lo que deja una respuesta.
+    for (const salteado of chats.slice(1, 5)) {
+      const e = state.todos()[salteado];
+      assert.ok(e.ultimaRespuestaSonnet === undefined && e.ultimaPropuestaBot === undefined && e.ficha === undefined, salteado);
+    }
   });
 
   await caso('si el chat no le llegaría al cliente (listas de prueba), no sale y se avisa; ya al armar se dice', async () => {
@@ -514,6 +519,34 @@ async function mandarTanda(id, extra = '') {
       if (hablaAlGrupo) assert.ok(grupoCon(/^❓ No mando la tanda/).length === 1, alGrupo.join('|'));
       assert.strictEqual(tandas.leerTanda(id).estado, 'propuesta');
     }
+  });
+
+  await caso('si el cliente escribe en el medio del envío (mientras "escribe…"), ese chat no recibe nada', async () => {
+    const chatId = sembrar(1);
+    const id = await armarTanda();
+    const original = evolution.mostrarEscribiendo;
+    evolution.mostrarEscribiendo = async () => {
+      state.agregarAlHistorial(chatId, 'cliente', 'justo ahora', { id: 'C-JUSTO' });
+    };
+    try {
+      await mandarTanda(id);
+    } finally {
+      evolution.mostrarEscribiendo = original;
+    }
+    assert.strictEqual(aClientes.length, 0);
+    assert.ok(/el cliente escribió en el medio|tanda en curso/.test(grupoCon(/^Tanda \d+ mandada/)[0]), alGrupo.join('|'));
+    assert.strictEqual(state.datosDeTandas().chats[chatId], undefined);
+  });
+
+  await caso('lo que ya se le dijo se saca otra vez al mandar: si todo era repetido, no sale', async () => {
+    const chatId = sembrar(1);
+    const id = await armarTanda();
+    const dicho = tandas.leerTanda(id).chats[0].mensajes[0];
+    // Después de armar la propuesta aparece, más atrás en el chat, lo mismo que Erasmo iba a decir.
+    state.obtener(chatId).historial.unshift({ quien: 'vendedor', texto: dicho, ts: Date.now() - 20 * DIA, id: 'V-VIEJO' });
+    await mandarTanda(id);
+    assert.strictEqual(aClientes.length, 0);
+    assert.ok(/ya se lo había dicho/.test(grupoCon(/^Tanda \d+ mandada/)[0]), alGrupo.join('|'));
   });
 
   await caso('un #apagar mientras se manda frena lo que falta', async () => {

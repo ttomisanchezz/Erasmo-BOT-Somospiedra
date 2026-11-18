@@ -161,3 +161,45 @@ Cerrado por Fran y Tomás (no se vuelve a decidir). Qué cambió: `src/granza.js
 8. Las reglas ya no dicen "no se vende por bolsón"; el ejemplo de la objeción de precio ahora dice "un bolsón son 20 bolsas de 40 kg".
 
 **Tests**: `granza` (tabla y bolsón), `erasmo-herramientas` (medios de pago, sin IVA ofrecido, bolsón, sin stock, compra grande), `stock-colores` (nuevo), `erasmo-fran-1117` (nuevo: el pedido con stock y cuotas) y 10 casos nuevos en `evaluar` (con Sonnet enlatado: prueban el circuito y las cuentas, **no el criterio de Sonnet**; eso se ve con el tester). Verificado con mutaciones: sacar el freno de color sin stock, o cambiar `>` por `>=` en el millón, hace fallar los tests.
+
+## Corrida 2026-11-18a: tandas para los chats sin contestar + reactivación de 2 mensajes
+
+Qué cambió: `src/tandas.js`, `src/reactivacion.js`, `src/reactivacion-textos.js`, `src/chats-elegibles.js`, `src/lectura-larga.js` (nuevos); `src/cerebro.js` (`pensar` con `tanda`, `armarContextoDeTanda`, `decidirReactivacion`, herramienta `no_contestar`), `src/index.js` (comandos del grupo, candados comunes, barrido), `src/state.js`, `src/config.js`, `src/contexto.js` (`nuevasLineas` con `sinLimite`). Todo arranca **apagado**: nada manda sin `#tanda-ok` o sin `ERASMO_REACTIVACION_ACTIVA=true`. Cómo funciona, en `CLAUDE.md` ("Tandas de chats sin contestar y reactivación").
+
+### Lo que hay que mirar
+
+1. **Cómo se eligen los 40** (`tandas.seleccionar`): chats con estado donde la última línea del historial es del cliente (nadie escribió después), del más reciente al más viejo, menos los que ya estuvieron en una tanda mandada y los que `chats-elegibles.motivoQueNoCuenta` descarta (excluidos, personales, `@lid`/grupos, testers, pausados, escalados callados, `#vendido`/`#perdido`, `#bot`). Si Evolution muestra que ya contestó alguien (el estado no se enteró), ese chat ocupa lugar en la tanda pero va como `no_contestar` sin gastar a Sonnet.
+2. **El pedido a Sonnet de la tanda** (`cerebro.armarContextoDeTanda`): las reglas de siempre (mismo hash) en `system`; las instrucciones de la tarea van en el mensaje (responder / no_contestar mirando los últimos 20 mensajes / escalar; disculpas por la demora si pasaron más de 24 h; "no es una charla en vivo"). Lee hasta 150 mensajes (Evolution + estado) y de eso hasta 24.000 caracteres: **si no entran, se quedan afuera los más viejos** y el pedido lo dice ("otros N mensajes más viejos no entran"); las 20 últimas entran siempre. No hay una segunda llamada que resuma (decisión mía, ver abajo).
+3. **El pedido de la reactivación** (`cerebro.decidirReactivacion`): una llamada corta, con su propia instrucción (no las reglas de venta), los últimos 20 mensajes y una sola herramienta `decidir { mandar, motivo }`. Ante la duda, `false`. Sonnet no escribe el mensaje.
+4. **Candados al mandar** (index.js): por chat y otra vez justo antes de CADA mensaje: interruptor, escucha, borrador, `CEREBRO_MODO` ∈ {nuevos, todos}, excluido, `motivoQueNoCuenta`, una persona de la cuenta en los últimos 45 min, `leLlegaAlCliente`, tanda en curso del chat, que el cliente no haya escrito, y que **el último mensaje del chat en Evolution sea el mismo que se leyó** (si no se puede verificar, no se le escribe).
+
+### Lo que tiene que correr Tomás (yo no hice push, ni reinicio, ni toqué el `.env`)
+
+1. `git push` de la rama `piedra/archivos-excluidos` (y el merge a `main` si corresponde) y reiniciar el bot para que cargue el código nuevo.
+2. **Revisar `SOLO_CHATS_NUEVOS` en el `.env`**: si está en `true`, `leLlegaAlCliente` da false para todo chat viejo y ni la tanda ni la reactivación les escriben (el resumen de `#tanda` y `#reactivar-prueba` lo avisan: "no le llegaría"). Para que salgan, vacío o `false`. Los 337 chats son todos viejos.
+3. Probar en este orden, en el grupo "Bot Erasmo": `#reactivar` (dice APAGADA), `#reactivar-prueba` (arma `data/reactivacion/<fecha>.md`, no manda), `#tanda` (arma `data/tandas/<id>.md`, no manda). Leer el `.md`. Recién ahí `#tanda-ok <id>` (o `#tanda-ok <id> -4 -17` sin algunos).
+4. Para prender la reactivación: `ERASMO_REACTIVACION_ACTIVA=true` en el `.env` y reiniciar. Las otras cuatro variables, vacías, valen 40 / 2 / 7 / 30.
+5. Lo que tiene que pasar: `#tanda` responde en el grupo enseguida ("Armo la tanda N…") y tarda unos minutos en dar el resumen; `#tanda-ok` responde "Mando la tanda N…" y al terminar dice cuántos salieron y cuáles no (con el link del chat y el motivo). Ningún cliente recibe nada antes del `#tanda-ok`.
+
+### Decisiones que tomé solo (revisar)
+
+1. **Costo**: cada chat de la tanda es una llamada con hasta ~24.000 caracteres de conversación y las herramientas; con los precios de `config` (US$2 entrada / US$10 salida por millón) calculo **US$1 a 3 por tanda de 40**, o sea **US$10 a 30 por los 337 chats**, contra el tope de US$60 del mes (cuenta en el gasto del mes y avisa al 80%). Es una estimación, no la medí. La reactivación gasta mucho menos (una consulta corta por mensaje). `#tanda` con `CEREBRO_MODO=apagado` no gasta nada.
+2. **Sin segunda llamada que resuma** un chat largo (el prompt decía "lo resume si hace falta"): se recorta por caracteres, quedando siempre las 20 últimas, y se avisa cuántos no entran. Resumir con otra llamada sumaba costo y un punto más donde inventar datos.
+3. **Lo que no se pudo leer queda "salteado"** (una acción más, además de las tres del prompt): si Evolution falla al releer un chat o Sonnet da error, ese chat no se escala (escalar le manda al cliente "Enseguida te respondemos." por una falla nuestra) ni se marca: puede volver a entrar en otra tanda.
+4. **Qué marca a un chat como "ya estuvo en una tanda"**: solo una tanda **mandada** (respondidos, escalados, `no_contestar` y los sacados a mano con -N). Una tanda descartada (`#tanda-no`) o vencida no marca a nadie, y un chat salteado al mandar (escribió el cliente, etc.) tampoco: vuelve a entrar.
+5. **`#bot` (`atiendeSonnet: false`) excluye al chat** de las dos cosas (el prompt no lo listaba): mandar y dejar `atiendeSonnet: true` deshacía una decisión explícita de la cuenta.
+6. **`#tanda-ok` no manda con `CEREBRO_MODO` `tester` o `sombra`**, ni con borrador o escucha (el prompt solo pedía `leLlegaAlCliente`): en esos modos nadie le escribe a un cliente viejo. Armar la propuesta sí se puede con cualquiera menos `apagado`. La reactivación tiene el mismo freno.
+7. **Reactivación: a lo sumo 4 mensajes por barrido** (cada 15 min), para que los 40 del día no salgan juntos a las 10; y un seguimiento agendado (`s.seguimiento` futuro, o vencido sin avisar) saca al chat de la reactivación (no se le escribe a quien dijo "en marzo"). La ventana de 30 días de actividad del cliente se aplica también al mensaje 2. Después del mensaje 1, "sin respuesta" se cuenta desde lo último que escribió la cuenta.
+8. **`#reactivar-prueba`** mira los primeros `TOPE_DIA` candidatos (lo que saldría hoy) y cuenta el resto; no marca nada, ni siquiera los descartes de Sonnet.
+9. **Una tanda armándose o mandándose cuando el bot se reinicia** queda `interrumpida` (no sigue sola); lo que ya salió quedó marcado en el `.json`. Las propuestas no se borran de `data/tandas/`.
+10. **Los textos de la reactivación** están tal cual vinieron en el prompt (pendientes del OK de Tomás). `{producto}` es `ficha.pidio.producto`, el nombre del panel ("Laja Ocre 1 m²" suena raro en "por {producto} que estabas viendo"); si trae símbolos o algo que parezca un monto, cae a "la piedra". El código los manda sin pasar por la guardia de Sonnet, que frenaría "Te escribo de Somos Piedra" (promesa de contacto): el test lo deja dicho.
+
+### Riesgos que quedan
+
+- **Los precios de la propuesta valen hasta 6 h**: lo que Sonnet cotizó al armar la tanda es lo que sale al mandarla; si el panel cambia en ese rato, sale el viejo. Por eso vence a las 6 h.
+- **Un chat con el estado atrasado** (una persona contestó desde el celular con el bot caído) se detecta por Evolution al armar y al mandar; si Evolution falla, el chat se saltea. En la reactivación, un chat cuyo estado no coincide con Evolution se salta en cada barrido sin descartarse; con más de 12 chats así seguidos al tope de la lista (se evalúan 12 por barrido) podrían demorar a los demás.
+- **Dos mutaciones equivalentes** (candados repetidos a propósito, así que romper uno solo no cambia el resultado): `#apagar` se mira dos veces en la reactivación (`revisar` y `frenoGeneralDeEnvio`), y los candados de `revisar` justo antes de mandar se repiten en `mandarReactivacion`. Las demás hacen fallar su test.
+
+### Tests
+
+`test/tandas.test.js` (38 casos) y `test/reactivacion.test.js` (35 casos): selección de los 40 (orden y exclusiones), `no_contestar` / `escalar` / `responder`, nada sin `#tanda-ok`, vencimiento, `-N`, salteo si escribió alguien después de la propuesta (estado y Evolution), `atiendeSonnet` al mandar, el eco del grupo; reactivación: días, ventana, tope por día, franja y domingo, máximo 2 (también tras `#reset`), corte si contesta, descarte de Sonnet, `ACTIVA` vacía o falsa, textos con y sin nombre o producto. Sumados al script `test`.

@@ -242,6 +242,43 @@ Cómo prenderlo: `PRENDER-TESTER.md`. Qué revisar (cuentas y decisiones de plat
   así que después del `#incluir` Sonnet no lo ve.
 - Tests: `test/excluidos.test.js` (cada freno con su caso, verificados con mutaciones) y `test/personales.test.js`.
 
+## Tandas de chats sin contestar y reactivación de 2 mensajes (18/11/2026)
+
+Los dos le escriben a clientes que NO acaban de escribir, así que nada sale sin la orden de Tomás en el grupo "Bot Erasmo"
+(`#tanda-ok`) o sin `ERASMO_REACTIVACION_ACTIVA=true` (apagada por defecto). Chats elegibles y exclusiones, en un solo lugar:
+`src/chats-elegibles.js` (`motivoQueNoCuenta`: excluidos, personales, `@lid`/grupos, testers, pausados, escalados callados,
+`#vendido`/`#perdido`, `#bot`). La relectura larga de un chat sin escribir el estado: `src/lectura-larga.js` (`leerLargo`:
+historial guardado + hasta 150 de Evolution, unidos sin repetir; `contexto.completar` no sirve para esto).
+
+**Tandas (`src/tandas.js`).** `#tanda` toma los próximos **40** chats donde lo último es del cliente (del más reciente al más
+viejo, sin los de una tanda ya mandada) y por cada uno relee la conversación entera; Sonnet decide con `pensar({ tanda })`
+(`cerebro.armarContextoDeTanda`: mismas reglas, mismas herramientas, más `no_contestar`; el último mensaje se compara contra
+Evolution y, si ya contestó alguien, es `no_contestar` sin gastar a Sonnet): `responder` (con disculpas por la demora si pasó más
+de 24 h), `no_contestar` (con motivo) o `escalar`. **No manda nada**: deja `data/tandas/<id>.md` (número tapado salvo los últimos 4)
+y `<id>.json` y avisa al grupo. `#tanda-ok <id>` la manda (de a un chat, con el ritmo de siempre; `#tanda-ok <id> -4 -17` sin esos
+números de orden; `#tanda-no <id>` la descarta). Una tanda a la vez; vence a las 6 h; con `CEREBRO_MODO=apagado` ni se arma, y para
+MANDAR hace falta `nuevos` o `todos`, sin borrador ni escucha. Al mandar, por chat y justo antes de CADA mensaje (index.js,
+`frenoDeChatMasivo`, `cambioEnElChat`, `mandarChatDeTanda`): los candados de siempre, `leLlegaAlCliente` (con `SOLO_CHATS_NUEVOS=true`
+un chat viejo no recibe), que el último mensaje del chat siga siendo el que se leyó (se relee de Evolution; sin poder verificarlo, no
+se le escribe) y que lo ya dicho se saque otra vez. Los respondidos quedan con `atiendeSonnet: true`; un `escalar` sale como un
+escalado normal (🔕 y, solo si el chat se calla, "Enseguida te respondemos."). Marcas de los atendidos (respondidos, escalados,
+`no_contestar`, sacados con -N): `state.datosDeTandas().chats`, sobreviven a `#reset`; una tanda descartada o vencida no marca a
+nadie, y los salteados al mandar tampoco. Lo largo corre en segundo plano (`enBackground`): el comando contesta ya. Lo que el bot escribe
+al grupo nunca empieza con `#` (el eco vuelve como mensaje propio y un comando solo cuenta al principio).
+
+**Reactivación (`src/reactivacion.js`, textos en `src/reactivacion-textos.js`).** Chats donde lo último lo escribió la cuenta y el
+cliente no contestó en `ERASMO_REACTIVACION_DIAS_1` (2) días → mensaje 1; a los `_DIAS_2` (7) días sin respuesta → mensaje 2;
+**nunca más de 2 por chat** (marcas `m1`, `m2`, `descartado`, `cortado` en `state.datosDeReactivacion()`, sobreviven a `#reset`), solo
+con actividad del cliente en los últimos `_VENTANA_DIAS` (30). Si el cliente contesta después del 1, se corta para siempre. Los textos los
+escribe el CÓDIGO (los que aprobó Tomás: `reactivacion-textos.js`; no pasan por la guardia de Sonnet, que frenaría "Te escribo de…").
+Antes de cada uno, `cerebro.decidirReactivacion` (Sonnet lee los últimos 20 mensajes y devuelve `mandar` true/false): `false` descarta el chat
+para siempre; un error no descarta (se reintenta). Barrido cada 15 min (`revisarReactivacion`), lunes a sábado de 10 a 19 hora de Argentina, tope
+`_TOPE_DIA` (40) por día (cuenta lo que Evolution confirmó) y a lo sumo 4 por barrido; de a uno, con ritmo humano y los mismos candados.
+Lo que sale queda con `atiendeSonnet: true`. `#reactivar` dice el estado; `#reactivar-prueba` arma `data/reactivacion/<fecha>.md` con a quién le saldría
+hoy (Sonnet incluido) sin mandar ni marcar nada, aunque `ACTIVA` sea false. Con `ACTIVA` en false no sale nada ni se le pregunta a Sonnet.
+
+Tests: `test/tandas.test.js` y `test/reactivacion.test.js` (cada candado verificado con una mutación). Detalle y decisiones: "Corrida 2026-11-18a" en `REVISAR.md`.
+
 ## Protecciones que hay que conservar (resumen; detalle en `_heredado-iphone/CLAUDE-iphone.md`, "Protecciones que no hay que sacar")
 
 - Ritmo humano: espera de 20-45 s antes de interpretar; lo que llega en ese rato se junta en la misma
@@ -277,7 +314,8 @@ contesta lo que dejó escrito), `#reset`, `#recordar <qué>` / `#hecho`, `#vendi
 `#sonnet <n>` (qué contestaría, sin mandar nada), `#comparar <n>`, `#bot <n>` (sin Sonnet: queda en
 sombra), `#sonnet-si <n>`, `#excluir <n>` / `#incluir <n>` (sirve pegar un wa.me; se puede excluir un número
 que nunca escribió); sin número: `#sinstock <color>` / `#hay <color>` (un color de granza sin stock; `#sinstock` solo lista),
-`#excluidos` (la lista), `#apagar` / `#prender` (interruptor general,
+`#excluidos` (la lista), `#tanda` / `#tanda-ok <id> [-N …]` / `#tanda-no <id>` (los chats sin contestar, de a 40 y con tu OK),
+`#reactivar` / `#reactivar-prueba` (la reactivación de 2 mensajes), `#apagar` / `#prender` (interruptor general,
 local). **Desde el celular del tester**: `#reset`. Cada comando contesta en el grupo cómo se usa si se
 escribe mal (no hay un `#ayuda` central: cada módulo tiene su `COMO_SE_USA`).
 
@@ -297,7 +335,7 @@ granza. Las importantes: `EVOLUTION_INSTANCE` (obligatoria), `EVOLUTION_APIKEY`,
 audios), `MODO_ESCUCHA`, `MODO_BORRADOR`, `NUMEROS_TESTER`, `NUMEROS_PILOTO`, `CONTACTOS_PERSONALES`,
 `GENERADOS_DIR` (vacía: `data/generados`). Nuevas del 09/11/2026: `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
 `ERASMO_EMAIL`, `ERASMO_PASSWORD` (los precios del panel), `PRECIOS_CACHE_PATH` (vacía: `data/precios/panel-cache.json`),
-`AVISOS_HORA_DESDE` / `AVISOS_HORA_HASTA` (9 y 20). Ojo: `MODO_BORRADOR` vale `true` si falta en el `.env`.
+`AVISOS_HORA_DESDE` / `AVISOS_HORA_HASTA` (9 y 20). Nuevas del 18/11/2026 (reactivación, **apagada si faltan**): `ERASMO_REACTIVACION_ACTIVA` (`true` la prende), `ERASMO_REACTIVACION_TOPE_DIA` (40), `ERASMO_REACTIVACION_DIAS_1` (2), `ERASMO_REACTIVACION_DIAS_2` (7), `ERASMO_REACTIVACION_VENTANA_DIAS` (30); `TANDAS_DIR` / `REACTIVACION_DIR` (vacías: `data/tandas`, `data/reactivacion`). Las `REACTIVACION_*` heredadas de iPhone no se leen. Ojo: `MODO_BORRADOR` vale `true` si falta en el `.env`.
 
 ## Tests
 
@@ -315,7 +353,7 @@ audios), `MODO_ESCUCHA`, `MODO_BORRADOR`, `NUMEROS_TESTER`, `NUMEROS_PILOTO`, `C
 
 | Carpeta | Qué hay |
 |---|---|
-| `src/` | El bot: `index.js` (webhook, tandas, comandos, barridos), `cerebro.js` + `cerebro-reglas.md`, `config.js`, `state.js`, `evolution.js`, `control.js`, `contexto.js`, `audio.js` + `gemini.js`, `guardian.js`, `chats-viejos.js`, `autoria.js`, `aprendizaje.js`, `sombra-persona.js`, `cerebro-comandos.js`, `interruptor.js`, `promesas.js`, `recordatorios.js`, `ventas.js`, `excluidos.js`, `stock-colores.js`, `generados.js`, `salida.js`, `avisos-texto.js`, los de Piedra `cotizador-piedra.js` y `catalogo-piedra.js`, y los del modo tester (09/11): `precios-panel.js`, `granza.js`, `herramientas-erasmo.js`, `avisos-cola.js`, `seguimiento.js` y `ficha.js`. |
+| `src/` | El bot: `index.js` (webhook, tandas, comandos, barridos), `cerebro.js` + `cerebro-reglas.md`, `config.js`, `state.js`, `evolution.js`, `control.js`, `contexto.js`, `audio.js` + `gemini.js`, `guardian.js`, `chats-viejos.js`, `autoria.js`, `aprendizaje.js`, `sombra-persona.js`, `cerebro-comandos.js`, `interruptor.js`, `promesas.js`, `recordatorios.js`, `ventas.js`, `excluidos.js`, `stock-colores.js`, `generados.js`, `salida.js`, `avisos-texto.js`, los de Piedra `cotizador-piedra.js` y `catalogo-piedra.js`, y los del modo tester (09/11): `precios-panel.js`, `granza.js`, `herramientas-erasmo.js`, `avisos-cola.js`, `seguimiento.js` y `ficha.js`; y los del 18/11: `tandas.js`, `reactivacion.js`, `reactivacion-textos.js`, `chats-elegibles.js` y `lectura-larga.js`. |
 | `test/` | Los tests y los scripts (`evaluar.js`, `aprender.js`, `destino.js`, `sembrar-viejos.js`, `probar-contexto.js`). |
 | `reglas/` | Reglas y casos de Piedra (Etapa 2; las reglas del cerebro, aprobadas el 06/11, están copiadas y adaptadas en `src/cerebro-reglas.md`). |
 | `herramientas/historial/` | Exportador y clasificador del historial de Evolution (Etapa 1). |
@@ -334,6 +372,8 @@ audios), `MODO_ESCUCHA`, `MODO_BORRADOR`, `NUMEROS_TESTER`, `NUMEROS_PILOTO`, `C
 - **Responder y escalar en el mismo turno** (17/11/2026): hoy Sonnet termina con `responder` o con `escalar`, y al escalar el cliente solo recibe "Enseguida te respondemos.". Por eso Erasmo no dice "Cuotas no tenemos, pero en compras grandes se puede ver pagar en partes" (compra de más de $1.000.000) ni "los dólares se aceptan al promedio del blue" antes de pasar el chat: solo escala. Si Tomás quiere que lo diga, hay que cambiar el diseño de `escalar` (ver "Corrida 2026-11-17a" en `REVISAR.md`).
 - Sin forma de pago, `cotizar` da solo el total en efectivo o transferencia (la tarjeta, si la pide el cliente): es mi lectura de la nota de Fran del 17/11; confirmar.
 - Las 5 preguntas de precios del traspaso del 16/10 y las de `preguntas-para-fran-v2.md`.
+- **Textos de la reactivación** (18/11/2026): están como los dejó el prompt, pendientes del OK de Tomás; si los cambia, se cambian solo en `src/reactivacion-textos.js`. Con un producto del panel ("Laja X 1 m²") "por {producto} que estabas viendo" suena raro: ver `REVISAR.md`.
+- **`SOLO_CHATS_NUEVOS` y las tandas / la reactivación**: con `SOLO_CHATS_NUEVOS=true` en el `.env`, `leLlegaAlCliente` da false para los chats viejos y ni la tanda ni la reactivación les escriben (lo avisan). Hay que sacarlo (o dejarlo vacío) para que salgan.
 - Cuánto se guardan los archivos de `data/generados/` (spec del simulador §12.4): hoy no se borra nada.
 - Conectar `enviarGenerado` al cerebro (`simular_piedra`, `presupuesto_pdf`): fase F2 de la spec del simulador.
 - Si `#vendido` / `#perdido` / `#recordar` / `#pausa` tienen que valer en el chat de un excluido (hoy solo avisan

@@ -237,6 +237,15 @@ async function caso(nombre, fn) {
     assert.strictEqual(aClientes.length, 2);
   });
 
+  await caso('con el mensaje 1 y el 2 ya mandados, un chat que cumple todo lo demás NO vuelve a ser candidato', () => {
+    const chatId = sembrar(1, { cuentaHace: 20 * DIA, clienteHace: 20 * DIA + HORA });
+    reactivacion.anotar(chatId, { m1: MIERCOLES - 15 * DIA, m2: MIERCOLES - 8 * DIA });
+    assert.strictEqual(reactivacion.candidatos({ ahora: MIERCOLES }).lista.length, 0);
+    // Con solo el 1, los mismos datos sí lo vuelven candidato del 2: lo único que lo frena es el 2.
+    reactivacion.anotar(chatId, { m2: null });
+    assert.deepStrictEqual(reactivacion.candidatos({ ahora: MIERCOLES }).lista.map((c) => c.tipo), ['m2']);
+  });
+
   await caso('si el cliente contesta después del mensaje 1, se corta para siempre', async () => {
     const chatId = sembrar(1);
     await barrido(MIERCOLES);
@@ -272,6 +281,22 @@ async function caso(nombre, fn) {
   });
 
   console.log('\nSonnet decide si se manda\n');
+
+  await caso('si Evolution muestra que una persona de la cuenta escribió algo nuevo, no se le escribe', async () => {
+    sembrar(1);
+    evolution.buscarMensajesDeChat = async (j) => [
+      { key: { remoteJid: j, fromMe: true, id: 'EV-PERSONA' }, message: { conversation: 'Hola, te escribo yo' }, messageTimestamp: Math.floor((MIERCOLES - HORA) / 1000) },
+    ];
+    assert.strictEqual((await barrido(MIERCOLES)).enviados, 0);
+    assert.strictEqual(aClientes.length, 0);
+    assert.strictEqual(sonnet.pedidos.length, 0, 'ni se le pregunta a Sonnet');
+  });
+
+  await caso('si lo último que se le mandó no se confirmó (sin id), no se lo reactiva', () => {
+    const chatId = sembrar(1);
+    state.obtener(chatId).historial[1].sinConfirmar = true;
+    assert.strictEqual(reactivacion.candidatos({ ahora: MIERCOLES }).lista.length, 0);
+  });
 
   await caso('Sonnet dice que no: el chat queda descartado para siempre y no se le vuelve a preguntar', async () => {
     const chatId = sembrar(1, { nombre: 'Ana' });
