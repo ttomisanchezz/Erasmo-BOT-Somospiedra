@@ -117,20 +117,15 @@ async function caso(nombre, fn) {
 (async () => {
   console.log('\nLos textos (los escribe el código)\n');
 
-  await caso('mensaje 1: el texto aprobado, con nombre y producto', () => {
-    assert.strictEqual(
-      textos.mensaje1({ nombre: 'Juan', producto: 'Laja Ocre' }),
-      'Hola Juan! Cómo estás? Te escribo de Somos Piedra por Laja Ocre que estabas viendo. Pudiste avanzar? Si querés te ayudo a calcular cuánto necesitás.'
-    );
+  await caso('mensaje 1: el texto aprobado (18/11), sin nombrar el producto aunque haya uno cotizado', () => {
+    assert.strictEqual(textos.mensaje1({ nombre: 'Juan', producto: 'Laja Ocre 1 m²' }), 'Hola Juan! Cómo estás? Te escribo de Somos Piedra por lo que estabas consultando. Pudiste avanzar? Si querés te ayudo a calcular cuánto necesitás.');
+    assert.ok(!textos.mensaje1({ nombre: 'Juan', producto: 'Laja Ocre 1 m²' }).includes('Laja'));
   });
 
-  await caso('mensaje 1 sin producto: "la piedra", y sin nombre: "Hola!" sin coma suelta', () => {
-    assert.strictEqual(
-      textos.mensaje1({ nombre: 'Juan' }),
-      'Hola Juan! Cómo estás? Te escribo de Somos Piedra por la piedra que estabas viendo. Pudiste avanzar? Si querés te ayudo a calcular cuánto necesitás.'
-    );
+  await caso('mensaje 1 sin nombre: "Hola!" sin coma suelta', () => {
+    assert.strictEqual(textos.mensaje1({ nombre: 'Juan' }), 'Hola Juan! Cómo estás? Te escribo de Somos Piedra por lo que estabas consultando. Pudiste avanzar? Si querés te ayudo a calcular cuánto necesitás.');
     const sin = textos.mensaje1({});
-    assert.ok(sin.startsWith('Hola! Cómo estás?') && sin.includes('por la piedra que estabas viendo'));
+    assert.ok(sin.startsWith('Hola! Cómo estás?') && sin.includes('por lo que estabas consultando'));
     assert.ok(!/\s,|,\s*,|^,|Hola ,|Hola !/.test(sin), sin);
   });
 
@@ -145,10 +140,9 @@ async function caso(nombre, fn) {
   await caso('un nombre o un producto raro no entran al mensaje (símbolos, montos, demasiado largo)', () => {
     assert.ok(textos.mensaje1({ nombre: 'J@n$', producto: 'Laja' }).startsWith('Hola! '));
     assert.ok(textos.mensaje1({ nombre: '12345' }).startsWith('Hola! '));
-    for (const producto of ['Laja $45.000', 'Laja 45000', 'Laja 45.000', '<b>Laja</b>', 'x'.repeat(61), '']) {
-      assert.ok(textos.mensaje1({ producto }).includes('por la piedra que estabas viendo'), producto);
+    for (const producto of ['Laja $45.000', 'Laja 45000', 'Laja 45.000', '<b>Laja</b>', 'x'.repeat(61), '', 'Granza roja x 40 kg']) {
+      assert.ok(textos.mensaje1({ producto }).includes('por lo que estabas consultando'), producto);
     }
-    assert.ok(textos.mensaje1({ producto: 'Granza roja x 40 kg' }).includes('por Granza roja x 40 kg que'));
   });
 
   await caso('ninguno lleva montos y entran en un mensaje de WhatsApp (el código los escribe: no pasan por la guardia de Sonnet)', () => {

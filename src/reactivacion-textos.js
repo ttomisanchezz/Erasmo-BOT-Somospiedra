@@ -3,8 +3,9 @@
  * Los textos de la reactivación de Piedra (18/11/2026). Los escribe el CÓDIGO, no Sonnet: son los que aprobó Tomás y
  * si los cambia se cambian SOLO acá. Ninguno lleva montos.
  *
- *   mensaje1: «Hola {nombre}! Cómo estás? Te escribo de Somos Piedra por {producto} que estabas viendo. Pudiste avanzar?
- *             Si querés te ayudo a calcular cuánto necesitás.»   (sin producto: «…por la piedra que estabas viendo…»)
+ *   mensaje1: «Hola {nombre}! Cómo estás? Te escribo de Somos Piedra por lo que estabas consultando. Pudiste avanzar?
+ *             Si querés te ayudo a calcular cuánto necesitás.»   (Tomás, 18/11: sin nombrar el producto; con el nombre
+ *             del panel quedaba «por Laja Ocre 1 m² que estabas viendo».)
  *   mensaje2: «Hola {nombre}! Último mensajito de Somos Piedra. Si seguís con la obra, cualquier duda de piedras o
  *             cantidades acá estamos. Y si conseguiste otro presupuesto, pasámelo y vemos si lo podemos mejorar.»
  *
@@ -37,10 +38,9 @@ const saludo = (nombre) => {
   return n ? `Hola ${n}!` : 'Hola!';
 };
 
-/** El mensaje 1: a los DIAS_1 días de que la cuenta escribió y el cliente no contestó. */
-function mensaje1({ nombre = '', producto = '' } = {}) {
-  const cosa = productoSeguro(producto) || 'la piedra';
-  return `${saludo(nombre)} Cómo estás? Te escribo de Somos Piedra por ${cosa} que estabas viendo. Pudiste avanzar? Si querés te ayudo a calcular cuánto necesitás.`;
+/** El mensaje 1: a los DIAS_1 días de que la cuenta escribió y el cliente no contestó. No nombra el producto (Tomás, 18/11). */
+function mensaje1({ nombre = '' } = {}) {
+  return `${saludo(nombre)} Cómo estás? Te escribo de Somos Piedra por lo que estabas consultando. Pudiste avanzar? Si querés te ayudo a calcular cuánto necesitás.`;
 }
 
 /** El mensaje 2: a los DIAS_2 días del 1, si el cliente sigue sin contestar. El último. */

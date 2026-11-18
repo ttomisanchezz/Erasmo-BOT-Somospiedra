@@ -206,3 +206,5 @@ Qué cambió: `src/tandas.js`, `src/reactivacion.js`, `src/reactivacion-textos.j
 ### Tests
 
 `test/tandas.test.js` (44 casos) y `test/reactivacion.test.js` (39 casos): selección de los 40 (orden y exclusiones), `no_contestar` / `escalar` / `responder`, nada sin `#tanda-ok`, vencimiento, `-N`, salteo si escribió alguien después de la propuesta (estado y Evolution), `atiendeSonnet` al mandar, el eco del grupo; reactivación: días, ventana, tope por día, franja y domingo, máximo 2 (también tras `#reset`), corte si contesta, descarte de Sonnet, `ACTIVA` vacía o falsa, textos con y sin nombre o producto. Sumados al script `test`.
+
+**Revisión de Claude (18/11, tarde):** tests y evaluar en verde; `test/reactivacion.test.js` solo pasaba un miércoles antes de las 12 ("el próximo miércoles" contra el Date.now real): el reloj de la prueba ahora arranca ese miércoles a las 10 (`fc3f821`). Decisiones de Tomás: mensaje 1 «por lo que estabas consultando» (sin producto); los chats de una tanda reciben igual los 2 de la reactivación.
