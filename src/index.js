@@ -523,6 +523,12 @@ async function procesar(data) {
     chatsViejos.entroDelCliente(chatId, Number(data?.messageTimestamp?.low ?? data?.messageTimestamp ?? 0) * 1000);
   }
 
+  // Con CEREBRO_MODO=nuevos, un chat que llega por primera vez lo atiende Sonnet desde este mensaje, hasta
+  // #reset o #bot. Se mira ANTES de que nada toque el estado: anotar el anuncio (justo abajo) usa
+  // state.obtener, que crea el chat, y con eso ningún chat nuevo contaba como nuevo (18/11/2026, primera
+  // noche en vivo; test/piedra-nuevos-anuncio.test.js). Solo un mensaje del cliente abre un chat nuevo.
+  const nuevoParaSonnet = !data?.key?.fromMe && cerebro.esChatNuevo(chatId);
+
   // De qué anuncio de Meta vino el chat (src/anuncio.js): queda en el estado y en el aprendizaje, en todos los
   // modos (también apagado y en escucha). Solo anota; no cambia qué se contesta.
   if (!data?.key?.fromMe) {
@@ -653,9 +659,7 @@ async function procesar(data) {
   // La última actividad del chat ANTES de anotar esta línea, para saber si los datos guardados son viejos.
   const ultimaActividad = control.ultimaActividad(state.todos()[chatId]);
 
-  // Con CEREBRO_MODO=nuevos, un chat que llega por primera vez lo atiende Sonnet desde este mensaje, hasta
-  // #reset o #bot. Se mira ANTES de que el mensaje entre al estado.
-  const nuevoParaSonnet = cerebro.esChatNuevo(chatId);
+  // `nuevoParaSonnet` se calculó arriba, antes de anotar el anuncio.
 
   // Mensaje del cliente. Entra al historial YA, en el orden en que llegó. Un audio también: su línea se
   // reserva ahora y la transcripción la completa después.
