@@ -24,7 +24,7 @@ haya reglas aprobadas, **escala todo**. Lo de iPhone está en `_heredado-iphone/
 2. Escribir las reglas de Piedra (`reglas/cerebro-reglas-piedra.md`, cotización). Gate: Tomás las aprueba. (Hecho: aprobadas el 06/11/2026.)
 3. Construir la v1: las herramientas `buscar_productos`, `cotizar`, `mandar_catalogo` y `agendar_seguimiento` y el
    **modo tester** (09/11/2026, "Erasmo en modo tester" más abajo). Cómo prenderlo: `PRENDER-TESTER.md`. (Hecho; falta probarlo.)
-4. Probar y salir en vivo. Gate: solo con la frase explícita de Tomás ("prendé pilotos" / "prendé para todos").
+4. Probar y salir en vivo. Gate: solo con la frase explícita de Tomás ("prendé pilotos" / "prendé para todos"). (Hecho el 18/11/2026 00:35: `CEREBRO_MODO=nuevos` + `NUMEROS_PILOTO=todos`, con el arreglo `d19e0b7`.)
 5. Mejorar (opcional).
 
 **Nada se prende, no se manda ningún mensaje y no se sale a ningún cliente sin la frase de Tomás.**
