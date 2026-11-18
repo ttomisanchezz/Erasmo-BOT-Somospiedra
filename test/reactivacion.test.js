@@ -35,6 +35,14 @@ function proximoMiercoles() {
   throw new Error('no hay miércoles');
 }
 const MIERCOLES = proximoMiercoles(); // 12:00 AR
+// El reloj de la prueba arranca ese miércoles a las 10 AR (18/11/2026): los tiempos que se pasan a mano (`ahora`)
+// y los que el bot toma de Date.now (las líneas del historial al mandar, #reactivar-prueba) tienen que ser del mismo
+// día. Sin esto, la prueba solo pasaba un miércoles antes de las 12 (cuando "el próximo miércoles" era hoy).
+{
+  const real = Date.now;
+  const corrimiento = MIERCOLES - 2 * 60 * 60 * 1000 - real();
+  Date.now = () => real() + corrimiento;
+}
 /** Una hora de Argentina de un día relativo al miércoles: dia 0 = miércoles, 3 = sábado, 4 = domingo. */
 const ar = (dias, hora, min = 0) => MIERCOLES + dias * DIA + (hora - 12) * HORA + min * 60000;
 
