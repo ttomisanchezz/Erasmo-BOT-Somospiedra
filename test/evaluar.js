@@ -24,7 +24,7 @@ const stock = require('../src/stock-colores');
 const path = require('path');
 // El catálogo en PDF (de mentira) en la carpeta de documentos de la prueba. La granza sale de su tabla (sin panel).
 fs.mkdirSync(process.env.DOCS_DIR, { recursive: true });
-fs.writeFileSync(path.join(process.env.DOCS_DIR, 'Catalogo-Somos-Piedra-2026_3.pdf'), '%PDF-1.4 de mentira');
+fs.writeFileSync(path.join(process.env.DOCS_DIR, 'Catalogo-Somos-Piedra-2026_4.pdf'), '%PDF-1.4 de mentira');
 const enDias = (n) => new Date(Date.now() + n * 86400000 - 3 * 3600000).toISOString().slice(0, 10);
 
 const VERBOSO = process.argv.includes('-v');

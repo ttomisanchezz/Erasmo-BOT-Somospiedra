@@ -15,7 +15,7 @@ const armar = require('../herramientas/pruebas/armar');
 
 herr.usarCatalogoDelPanel(async () => armarCatalogo([{ PRODUCTO: 'Adoquines ojito', EFECTIVO: '78000.00', LISTA: '90000.00', UNIDAD: 'm2' }]));
 fs.mkdirSync(process.env.DOCS_DIR, { recursive: true });
-fs.writeFileSync(path.join(process.env.DOCS_DIR, 'Catalogo-Somos-Piedra-2026_3.pdf'), '%PDF-1.4 de mentira');
+fs.writeFileSync(path.join(process.env.DOCS_DIR, 'Catalogo-Somos-Piedra-2026_4.pdf'), '%PDF-1.4 de mentira');
 evolution.enviarDocumento = async (numero) => (aClientes.push({ numero, texto: '[documento]' }), { key: { remoteJid: numero, fromMe: true, id: 'DOCP1' } });
 
 const hoy = armar.diaDe(Date.now());

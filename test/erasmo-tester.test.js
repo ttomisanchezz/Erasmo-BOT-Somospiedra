@@ -22,7 +22,7 @@ const avisosCola = require('../src/avisos-cola');
 
 herr.usarCatalogoDelPanel(async () => armarCatalogo([{ PRODUCTO: 'Adoquines ojito', EFECTIVO: '78000.00', LISTA: '90000.00', UNIDAD: 'm2' }]));
 fs.mkdirSync(process.env.DOCS_DIR, { recursive: true });
-fs.writeFileSync(path.join(process.env.DOCS_DIR, 'Catalogo-Somos-Piedra-2026_3.pdf'), '%PDF-1.4 de mentira');
+fs.writeFileSync(path.join(process.env.DOCS_DIR, 'Catalogo-Somos-Piedra-2026_4.pdf'), '%PDF-1.4 de mentira');
 
 // El documento: se anota qué id le devolvió Evolution a cada envío (para el eco).
 const documentos = [];
@@ -202,7 +202,7 @@ const alCliente = (num) => aClientes.filter((m) => m.numero === jid(num)).map((m
     }
   });
   await check('los candados de enviarDocumento (los de verdad): escucha, borrador, fuera de la lista, excluido', async () => {
-    const ruta = path.join(process.env.DOCS_DIR, 'Catalogo-Somos-Piedra-2026_3.pdf');
+    const ruta = path.join(process.env.DOCS_DIR, 'Catalogo-Somos-Piedra-2026_4.pdf');
     const probar = (chat) => real.enviarDocumento(jid(chat), ruta, '', 0);
     config.modoEscucha = true;
     assert.strictEqual((await probar(TESTER)).motivo, 'modo escucha');

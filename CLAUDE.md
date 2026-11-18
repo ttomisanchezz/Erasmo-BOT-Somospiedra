@@ -170,7 +170,7 @@ Cómo prenderlo: `PRENDER-TESTER.md`. Qué revisar (cuentas y decisiones de plat
   cuotas, cheque ni dólares (el pago mixto se cotiza con efectivo); un color sin stock no se cotiza; avisa `compra_grande` sobre $1.000.000; más de 100 m² escala; la multiplicación de largo × ancho la hace el
   código), `mandar_catalogo` y `agendar_seguimiento`. **Las dos últimas no hacen nada en el acto**: anotan en
   `turno.acciones` y `index.js` las ejecuta DESPUÉS de mandar los textos (y solo si el turno no escaló).
-- **Catálogo PDF** (`mandar_catalogo`): `documentos/Catalogo-Somos-Piedra-2026_3.pdf` (carpeta fuera de git), por
+- **Catálogo PDF** (`mandar_catalogo`): `documentos/Catalogo-Somos-Piedra-2026_4.pdf` (carpeta fuera de git; el nuevo de 25 páginas desde el 18/11/2026, se genera en `E:\anuncios somos piedra\catalogo-2026`; el `_3` quedó como respaldo), por
   `src/documentos.js`. Sale por `mandarCatalogo` de `index.js`: "escribiendo…", ritmo, control (pausa, escalado, una
   persona, mensaje nuevo) y `enviarAlCliente` (el eco del PDF no cuenta como una persona de la cuenta), con los
   candados de `evolution.enviarDocumento` (escucha, **borrador** —nuevo—, listas, excluidos, carpeta). Una vez por

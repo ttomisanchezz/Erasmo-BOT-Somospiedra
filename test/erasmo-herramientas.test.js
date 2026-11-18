@@ -285,7 +285,7 @@ const totalesDe = (r) => r.totales.map((t) => t.total);
   });
 
   console.log('\nmandar_catalogo');
-  const CAT = path.join(process.env.DOCS_DIR, 'Catalogo-Somos-Piedra-2026_3.pdf');
+  const CAT = path.join(process.env.DOCS_DIR, 'Catalogo-Somos-Piedra-2026_4.pdf');
   await check('sin el PDF en documentos/: error, no acciona', async () => {
     const t = turno();
     const r = await por('mandar_catalogo').correr({}, t);
